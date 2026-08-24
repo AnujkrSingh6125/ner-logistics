@@ -20,6 +20,7 @@ import {
   fetchShipments,
   updateShipmentTelemetry,
   subscribeToAllShipmentsRealtime,
+  subscribeToAllHazardsRealtime,
   BASELINE_SUPPLY_HUBS,
   BASELINE_DISRUPTIONS,
   FALLBACK_SHIPMENTS,
@@ -127,45 +128,67 @@ export default function DashboardPage() {
     loadData();
   }, [loadData]);
 
-  // Realtime Supabase Subscription on road_disruptions table
+  // Realtime Supabase Subscription on road_disruptions & hazards tables
   useEffect(() => {
-    if (!supabase) return;
+    const unsub = subscribeToAllHazardsRealtime(
+      (newDisruption) => {
+        setDisruptions((prev) => {
+          if (prev.some((d) => d.id === newDisruption.id)) return prev;
+          return [newDisruption, ...prev];
+        });
 
-    console.log('[SUPABASE REALTIME] Subscribing to public:road_disruptions...');
-    const channel = supabase
-      .channel('public:road_disruptions')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'road_disruptions' },
-        (payload) => {
-          console.log('[SUPABASE REALTIME DISRUPTIONS EVENT]', payload.eventType, payload);
-          if (payload.eventType === 'INSERT') {
-            const newDisruption = payload.new as RoadDisruption;
-            setDisruptions((prev) => {
-              if (prev.some((d) => d.id === newDisruption.id)) return prev;
-              return [newDisruption, ...prev];
-            });
-          } else if (payload.eventType === 'UPDATE') {
-            const updatedDisruption = payload.new as RoadDisruption;
-            setDisruptions((prev) =>
-              prev.map((d) => (d.id === updatedDisruption.id ? updatedDisruption : d))
-            );
-          } else if (payload.eventType === 'DELETE') {
-            const oldId = payload.old?.id;
-            if (oldId) {
-              setDisruptions((prev) => prev.filter((d) => d.id !== oldId));
+        // Dynamic Real-time Corridor Re-route Risk Check
+        if (routeData && originHub && destHub) {
+          const activeCoords =
+            routeData.candidateRoutes?.[selectedRouteIndex]?.geometry?.coordinates ||
+            routeData.primaryRoute?.geometry?.coordinates;
+
+          if (activeCoords && activeCoords.length >= 2) {
+            try {
+              const routeLine = turf.lineString(activeCoords);
+              const hazardPt = turf.point([newDisruption.longitude, newDisruption.latitude]);
+              const distMeters = turf.pointToLineDistance(hazardPt, routeLine, { units: 'meters' });
+              const bufferMeters = newDisruption.risk_radius_meters || 1500;
+
+              if (distMeters <= bufferMeters) {
+                console.log(
+                  `[REALTIME HAZARD INTERCEPTION] New hazard intersects planned route (${Math.round(
+                    distMeters
+                  )}m away). Recalculating resilient path...`
+                );
+                calculateRoute(
+                  originHub.latitude,
+                  originHub.longitude,
+                  destHub.latitude,
+                  destHub.longitude,
+                  'driving',
+                  originHub.name,
+                  destHub.name,
+                  cargoTier
+                )
+                  .then((recalculated) => setRouteData(recalculated))
+                  .catch((e) => console.warn('Hazard-triggered re-routing notice:', e));
+              }
+            } catch (err) {
+              // Ignore turf computation error
             }
           }
         }
-      )
-      .subscribe();
+      },
+      (updatedDisruption) => {
+        setDisruptions((prev) =>
+          prev.map((d) => (d.id === updatedDisruption.id ? updatedDisruption : d))
+        );
+      },
+      (oldId) => {
+        setDisruptions((prev) => prev.filter((d) => d.id !== oldId));
+      }
+    );
 
     return () => {
-      if (supabase) {
-        supabase.removeChannel(channel);
-      }
+      unsub();
     };
-  }, []);
+  }, [routeData, originHub, destHub, selectedRouteIndex, cargoTier]);
 
   // Realtime Supabase Subscription on shipments table
   useEffect(() => {

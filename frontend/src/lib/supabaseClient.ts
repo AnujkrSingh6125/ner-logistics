@@ -327,41 +327,50 @@ export async function fetchShipments(): Promise<Shipment[]> {
   return activeShipmentsMemory;
 }
 
+// Helper to check valid UUID
+const isValidUUID = (val?: string) =>
+  Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val));
+
 // Insert Shipment strictly for Authorized Supply Hub Accounts
 export async function insertShipment(
   input: RegisterShipmentInput,
   creatorHubId?: string
 ): Promise<Shipment> {
   const trackingCode = `NER-SHP-${Math.floor(1000 + Math.random() * 9000)}`;
+  const originLat = Number(input.origin_lat) || 26.1445;
+  const originLng = Number(input.origin_lng) || 91.7362;
+  const destLat = Number(input.destination_lat) || 25.5788;
+  const destLng = Number(input.destination_lng) || 91.8933;
+
   const newShipment: Shipment = {
     id: `shp-${Date.now()}`,
     tracking_code: trackingCode,
     driver_id: input.driver_id || `NER-CIT-${Math.floor(10000 + Math.random() * 90000)}`,
-    driver_name: input.driver_name,
-    origin_hub_id: input.origin_hub_id,
-    origin_name: input.origin_name,
+    driver_name: input.driver_name || 'Assigned Driver',
+    origin_hub_id: isValidUUID(input.origin_hub_id) ? input.origin_hub_id : undefined,
+    origin_name: input.origin_name || 'Origin Supply Hub',
     origin: {
-      name: input.origin_name,
-      latitude: input.origin_lat || 26.1445,
-      longitude: input.origin_lng || 91.7362,
+      name: input.origin_name || 'Origin Supply Hub',
+      latitude: originLat,
+      longitude: originLng,
     },
-    destination_hub_id: input.destination_hub_id,
-    destination_name: input.destination_name,
+    destination_hub_id: isValidUUID(input.destination_hub_id) ? input.destination_hub_id : undefined,
+    destination_name: input.destination_name || 'Destination Hub',
     destination: {
-      name: input.destination_name,
-      latitude: input.destination_lat || 25.5788,
-      longitude: input.destination_lng || 91.8933,
+      name: input.destination_name || 'Destination Hub',
+      latitude: destLat,
+      longitude: destLng,
     },
-    cargo_type: input.cargo_type,
-    cargo_tier: input.cargo_tier,
-    cargo_manifest: input.cargo_manifest,
+    cargo_type: input.cargo_type || 'GENERAL',
+    cargo_tier: input.cargo_tier || 'TIER_1_CRITICAL',
+    cargo_manifest: input.cargo_manifest || 'Essential Logistics Consignment',
     priority_level:
       input.priority_level ||
       (input.cargo_tier === 'TIER_1_CRITICAL' ? 5 : input.cargo_tier === 'TIER_2_ESSENTIAL' ? 4 : 3),
     weight_tonnes: Number(input.weight_tonnes) || 5,
     current_status: 'IN_TRANSIT',
-    current_lat: input.origin_lat || 26.1445,
-    current_lng: input.origin_lng || 91.7362,
+    current_lat: originLat,
+    current_lng: originLng,
     heading: 0,
     speed: 45,
     speed_kmh: 45,
@@ -373,45 +382,53 @@ export async function insertShipment(
 
   if (supabase) {
     try {
+      const payload: Record<string, any> = {
+        tracking_code: newShipment.tracking_code,
+        driver_id: newShipment.driver_id,
+        driver_name: newShipment.driver_name,
+        origin_name: newShipment.origin_name,
+        destination_name: newShipment.destination_name,
+        origin: newShipment.origin_name,
+        destination: newShipment.destination_name,
+        cargo_type: newShipment.cargo_type,
+        cargo_tier: newShipment.cargo_tier,
+        cargo_manifest: newShipment.cargo_manifest,
+        priority_level: newShipment.priority_level,
+        weight_tonnes: newShipment.weight_tonnes,
+        current_status: newShipment.current_status,
+        status: newShipment.current_status,
+        current_lat: newShipment.current_lat,
+        current_lng: newShipment.current_lng,
+        heading: newShipment.heading,
+        speed: newShipment.speed,
+        dispatched_by_hub_id: newShipment.dispatched_by_hub_id,
+        notes: newShipment.notes || null,
+        created_at: newShipment.created_at,
+        last_ping_at: newShipment.last_ping_at,
+      };
+
+      if (isValidUUID(newShipment.origin_hub_id)) {
+        payload.origin_hub_id = newShipment.origin_hub_id;
+      }
+      if (isValidUUID(newShipment.destination_hub_id)) {
+        payload.destination_hub_id = newShipment.destination_hub_id;
+      }
+
+      console.log('[SUPABASE SHIPMENT INSERT PAYLOAD]:', payload);
       const { data, error } = await supabase
         .from('shipments')
-        .insert([
-          {
-            tracking_code: newShipment.tracking_code,
-            driver_id: newShipment.driver_id,
-            driver_name: newShipment.driver_name,
-            origin_hub_id: newShipment.origin_hub_id,
-            destination_hub_id: newShipment.destination_hub_id,
-            origin_name: newShipment.origin_name,
-            destination_name: newShipment.destination_name,
-            origin: newShipment.origin,
-            destination: newShipment.destination,
-            cargo_type: newShipment.cargo_type,
-            cargo_tier: newShipment.cargo_tier,
-            cargo_manifest: newShipment.cargo_manifest,
-            priority_level: newShipment.priority_level,
-            weight_tonnes: newShipment.weight_tonnes,
-            current_status: newShipment.current_status,
-            current_lat: newShipment.current_lat,
-            current_lng: newShipment.current_lng,
-            heading: newShipment.heading,
-            speed: newShipment.speed,
-            dispatched_by_hub_id: newShipment.dispatched_by_hub_id,
-            notes: newShipment.notes,
-            created_at: newShipment.created_at,
-            last_ping_at: newShipment.last_ping_at,
-          },
-        ])
+        .insert([payload])
         .select()
         .single();
 
       if (!error && data) {
+        console.log('[SUPABASE SHIPMENT SAVED SUCCESSFULLY]:', data.id, data.tracking_code);
         newShipment.id = data.id;
       } else if (error) {
-        console.warn('[SUPABASE SHIPMENT INSERT WARN]:', error.message);
+        console.error('[SUPABASE SHIPMENT SAVE ERROR]:', error.message, error.details || error);
       }
     } catch (err) {
-      console.warn('Supabase shipment insert exception:', err);
+      console.error('[SUPABASE SHIPMENT INSERT EXCEPTION]:', err);
     }
   }
 
@@ -446,22 +463,23 @@ export async function updateShipmentTelemetry(
 
   if (supabase) {
     try {
-      await supabase
+      const { error } = await supabase
         .from('shipments')
         .update({
           current_lat: telemetry.current_lat,
           current_lng: telemetry.current_lng,
-          heading: telemetry.heading,
-          speed: telemetry.speed,
+          heading: telemetry.heading ?? 0,
+          speed: telemetry.speed ?? 0,
           last_ping_at: new Date().toISOString(),
         })
         .eq('id', shipmentId);
-      return true;
+
+      if (!error) return true;
     } catch (err) {
-      console.warn('Supabase update shipment telemetry error:', err);
+      console.warn('Supabase telemetry update exception:', err);
     }
   }
-  return true;
+  return false;
 }
 
 // Supabase Realtime WebSocket subscription for a single shipment
@@ -528,6 +546,82 @@ export function subscribeToAllShipmentsRealtime(
     };
   } catch (err) {
     console.warn('Realtime all shipments subscription error:', err);
+    return () => {};
+  }
+}
+
+// Supabase Realtime WebSocket subscription for hazards/disruptions
+export function subscribeToAllHazardsRealtime(
+  onInsert: (hazard: RoadDisruption) => void,
+  onUpdate: (hazard: RoadDisruption) => void,
+  onDelete: (id: string) => void
+) {
+  if (!supabase) return () => {};
+
+  try {
+    const channel = supabase
+      .channel('realtime-hazards-corridor')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'road_disruptions' },
+        (payload: any) => {
+          if (payload.eventType === 'INSERT' && payload.new) {
+            onInsert(payload.new as RoadDisruption);
+          } else if (payload.eventType === 'UPDATE' && payload.new) {
+            onUpdate(payload.new as RoadDisruption);
+          } else if (payload.eventType === 'DELETE' && payload.old) {
+            onDelete(payload.old.id);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'hazards' },
+        (payload: any) => {
+          if (payload.eventType === 'INSERT' && payload.new) {
+            const h = payload.new;
+            onInsert({
+              id: h.id,
+              title: h.title || h.name || 'Hazard Alert',
+              disruption_type: h.disruption_type || h.hazard_type || 'LANDSLIDE',
+              severity: h.severity || 'HIGH',
+              risk_radius_meters: h.risk_radius_meters || h.radius_meters || 1000,
+              latitude: Number(h.latitude || h.lat),
+              longitude: Number(h.longitude || h.lng),
+              message: h.message || h.description || '',
+              description: h.description || h.message || '',
+              is_active: h.is_active ?? true,
+              is_simulated: h.is_simulated ?? false,
+              created_at: h.created_at || new Date().toISOString(),
+            } as RoadDisruption);
+          } else if (payload.eventType === 'UPDATE' && payload.new) {
+            const h = payload.new;
+            onUpdate({
+              id: h.id,
+              title: h.title || h.name || 'Hazard Alert',
+              disruption_type: h.disruption_type || h.hazard_type || 'LANDSLIDE',
+              severity: h.severity || 'HIGH',
+              risk_radius_meters: h.risk_radius_meters || h.radius_meters || 1000,
+              latitude: Number(h.latitude || h.lat),
+              longitude: Number(h.longitude || h.lng),
+              message: h.message || h.description || '',
+              description: h.description || h.message || '',
+              is_active: h.is_active ?? true,
+              is_simulated: h.is_simulated ?? false,
+              created_at: h.created_at || new Date().toISOString(),
+            } as RoadDisruption);
+          } else if (payload.eventType === 'DELETE' && payload.old) {
+            onDelete(payload.old.id);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  } catch (err) {
+    console.warn('Realtime hazards subscription error:', err);
     return () => {};
   }
 }

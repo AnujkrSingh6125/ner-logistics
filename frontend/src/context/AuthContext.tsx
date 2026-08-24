@@ -452,7 +452,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
-  // 3. Public Citizen Login (Against Supabase client_users / Demo Accounts)
+  // 3. Public Citizen Login (Against Supabase Auth, client_users & Local Demo Accounts)
   const loginPublic = async (
     identifier: string,
     password: string
@@ -484,7 +484,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: true, message: 'Welcome back, Anirban Das!' };
     }
 
-    // B. Query Supabase client_users
+    // B. Direct Supabase Auth Sign In (if valid email)
+    if (supabase && cleanIdentifier.includes('@')) {
+      try {
+        const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
+          email: cleanIdentifier,
+          password: password,
+        });
+
+        if (!authErr && authData?.user) {
+          const userMeta = authData.user.user_metadata || {};
+          let profile: UserProfile = {
+            id: authData.user.id,
+            citizen_uid: userMeta.citizen_uid || `NER-CIT-${Math.floor(10000 + Math.random() * 90000)}`,
+            email: authData.user.email || cleanIdentifier,
+            phone: userMeta.phone || '+91 98765 43210',
+            full_name: userMeta.full_name || cleanIdentifier.split('@')[0],
+            role: userMeta.role === 'GOV_AUTHORITY' ? 'gov_official' : userMeta.role === 'SUPPLY_HUB' ? 'hub_operator' : 'citizen',
+            state: 'Assam',
+            is_verified: true,
+            is_sharing_location: true,
+            current_lat: 26.1445,
+            current_lng: 91.7362,
+            created_at: authData.user.created_at,
+          };
+          profile = await syncCitizenToSupabase(profile);
+          saveSession(profile);
+          closeAuthModal();
+          return { success: true, message: `Welcome back, ${profile.full_name}!` };
+        }
+      } catch (authEx) {
+        console.warn('Supabase auth password login notice:', authEx);
+      }
+    }
+
+    // C. Query Supabase client_users Table
     if (supabase) {
       try {
         const isUid = cleanIdentifier.toUpperCase().startsWith('NER-CIT-');
@@ -517,7 +551,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // C. Check Local Registered DB
+    // D. Check Local Registered Cache
     try {
       const localDB = JSON.parse(localStorage.getItem(REGISTERED_CITIZENS_KEY) || '[]');
       const match = localDB.find(
@@ -542,7 +576,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
-  // 4. Send Brevo Email Verification OTP
+  // 4. Send Brevo Email Verification OTP & Synchronize with Supabase Auth
   const sendEmailOTP = async (
     fullName: string,
     email: string,
@@ -554,6 +588,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const cleanName = fullName.trim();
     const generatedUid = `NER-CIT-${Math.floor(10000 + Math.random() * 90000)}`;
 
+    // A. Check if Supabase Auth instantly verifies (if email confirmation is turned off in Supabase)
+    if (supabase) {
+      try {
+        const { data: supaAuthData, error: supaAuthErr } = await supabase.auth.signUp({
+          email: cleanEmail,
+          password: password || 'Citizen@2026',
+          options: {
+            data: {
+              role: 'CITIZEN_DRIVER',
+              citizen_uid: generatedUid,
+              full_name: cleanName,
+              phone: cleanPhone,
+            },
+          },
+        });
+
+        if (supaAuthData?.session && supaAuthData.user) {
+          console.log('[SUPABASE AUTH] Instant account activation without email block');
+          let instantProfile: UserProfile = {
+            id: supaAuthData.user.id,
+            citizen_uid: generatedUid,
+            email: cleanEmail,
+            phone: cleanPhone,
+            full_name: cleanName,
+            role: 'citizen',
+            state: 'Assam',
+            is_verified: true,
+            is_sharing_location: true,
+            current_lat: 26.1445,
+            current_lng: 91.7362,
+            created_at: new Date().toISOString(),
+          };
+          instantProfile = await syncCitizenToSupabase(instantProfile);
+          saveSession(instantProfile);
+          closeAuthModal();
+          return {
+            success: true,
+            message: `Account Activated! Welcome, ${cleanName}.`,
+          };
+        } else if (supaAuthErr) {
+          console.warn('[SUPABASE AUTH NOTICE]:', supaAuthErr.message);
+        }
+      } catch (authEx) {
+        console.warn('[SUPABASE AUTH SIGNUP EXCEPTION]:', authEx);
+      }
+    }
+
+    // B. Dispatch Brevo Email OTP
     try {
       const res = await fetch('/api/auth/send-otp', {
         method: 'POST',
