@@ -510,9 +510,9 @@ export default function MapClient({
 
   // Custom DivIcon for Supply Hubs
   const createHubIcon = (hub: SupplyHub) => {
-    const isOrigin = originHub?.id === hub.id;
-    const isDest = destHub?.id === hub.id;
-    const isSelected = selectedHub?.id === hub.id;
+    const isOrigin = (originHub?.name && originHub.name === hub.name) || originHub?.id === hub.id;
+    const isDest = (destHub?.name && destHub.name === hub.name) || destHub?.id === hub.id;
+    const isSelected = (selectedHub?.name && selectedHub.name === hub.name) || selectedHub?.id === hub.id;
 
     let bgGradient = 'from-blue-600 to-indigo-700 border-blue-400 text-white';
     let ringClass = 'shadow-blue-500/20';
@@ -1178,7 +1178,7 @@ export default function MapClient({
         {showHubs &&
           safeHubs.map((hub) => (
             <Marker
-              key={`hub-${hub.id}`}
+              key={`hub-${hub.name || hub.id}`}
               position={[hub.latitude, hub.longitude]}
               icon={createHubIcon(hub)}
               eventHandlers={{

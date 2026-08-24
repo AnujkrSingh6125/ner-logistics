@@ -39,8 +39,8 @@ export default function RegisterShipmentModal({
 
   const [driverName, setDriverName] = useState('Rajesh Borah');
   const [driverId, setDriverId] = useState(`NER-CIT-${Math.floor(10000 + Math.random() * 90000)}`);
-  const [originHubId, setOriginHubId] = useState(defaultOriginHub?.id || BASELINE_SUPPLY_HUBS[0].id);
-  const [destHubId, setDestHubId] = useState(defaultDestHub?.id || BASELINE_SUPPLY_HUBS[1].id);
+  const [originHubId, setOriginHubId] = useState(defaultOriginHub?.name || defaultOriginHub?.id || BASELINE_SUPPLY_HUBS[0].name);
+  const [destHubId, setDestHubId] = useState(defaultDestHub?.name || defaultDestHub?.id || BASELINE_SUPPLY_HUBS[1].name);
   const [cargoType, setCargoType] = useState<CargoType>('MEDICINE');
   const [cargoTier, setCargoTier] = useState<CargoTier>(defaultCargoTier);
   const [cargoManifest, setCargoManifest] = useState('Critical Anti-Venom, Blood Units & Trauma Kits');
@@ -51,8 +51,8 @@ export default function RegisterShipmentModal({
 
   if (!isOpen) return null;
 
-  const originHub = BASELINE_SUPPLY_HUBS.find((h) => h.id === originHubId) || BASELINE_SUPPLY_HUBS[0];
-  const destHub = BASELINE_SUPPLY_HUBS.find((h) => h.id === destHubId) || BASELINE_SUPPLY_HUBS[1];
+  const originHub = BASELINE_SUPPLY_HUBS.find((h) => h.name === originHubId || h.id === originHubId) || BASELINE_SUPPLY_HUBS[0];
+  const destHub = BASELINE_SUPPLY_HUBS.find((h) => h.name === destHubId || h.id === destHubId) || BASELINE_SUPPLY_HUBS[1];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,11 +72,11 @@ export default function RegisterShipmentModal({
       const input: RegisterShipmentInput = {
         driver_name: driverName.trim(),
         driver_id: driverId.trim(),
-        origin_hub_id: originHub.id,
+        origin_hub_id: originHub.name || originHub.id || 'Guwahati Central Hub',
         origin_name: originHub.name,
         origin_lat: originHub.latitude,
         origin_lng: originHub.longitude,
-        destination_hub_id: destHub.id,
+        destination_hub_id: destHub.name || destHub.id || 'Silchar Logistics Depot',
         destination_name: destHub.name,
         destination_lat: destHub.latitude,
         destination_lng: destHub.longitude,
@@ -202,7 +202,7 @@ export default function RegisterShipmentModal({
                 className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
               >
                 {BASELINE_SUPPLY_HUBS.map((hub) => (
-                  <option key={hub.id} value={hub.id}>
+                  <option key={hub.name} value={hub.name}>
                     {hub.name} ({hub.state})
                   </option>
                 ))}
@@ -219,7 +219,7 @@ export default function RegisterShipmentModal({
                 className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
               >
                 {BASELINE_SUPPLY_HUBS.map((hub) => (
-                  <option key={hub.id} value={hub.id}>
+                  <option key={hub.name} value={hub.name}>
                     {hub.name} ({hub.state})
                   </option>
                 ))}

@@ -109,15 +109,22 @@ export interface AuthSession {
 }
 
 export interface SupplyHub {
-  id: string;
-  name: string;
+  id?: string;
+  name: string; // PRIMARY KEY
   state: string;
+  district?: string;
   latitude: number;
   longitude: number;
-  capacity_tonnes: number;
+  capacity_tons?: number;
+  capacity_tonnes?: number;
+  current_load_tons?: number;
+  status?: 'OPERATIONAL' | 'CRITICAL' | 'MAINTENANCE' | string;
+  contact_number?: string;
   contact_person?: string;
   contact_phone?: string;
   is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export type DisruptionType = 'LANDSLIDE' | 'FLASH_FLOOD' | 'ROAD_BLOCK' | 'BRIDGE_DAMAGE';
