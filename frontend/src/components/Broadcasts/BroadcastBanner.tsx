@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import CreateBroadcastModal from './CreateBroadcastModal';
 import AllBroadcastsModal from './AllBroadcastsModal';
+import { subscribeToAllBroadcastsRealtime } from '@/lib/supabaseClient';
 
 export default function BroadcastBanner() {
   const { isGovOfficial } = useAuth();
@@ -55,8 +56,20 @@ export default function BroadcastBanner() {
 
   useEffect(() => {
     fetchBroadcasts();
-    const interval = setInterval(fetchBroadcasts, 30000); // 30s polling
-    return () => clearInterval(interval);
+    const unsub = subscribeToAllBroadcastsRealtime(
+      (incoming) => {
+        setBroadcasts((prev) => [incoming, ...prev.filter((b) => b.id !== incoming.id)]);
+      },
+      (updated) => {
+        setBroadcasts((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
+      },
+      (deletedId) => {
+        setBroadcasts((prev) => prev.filter((b) => b.id !== deletedId));
+      }
+    );
+    return () => {
+      unsub();
+    };
   }, []);
 
   const activeBroadcasts = broadcasts.filter((b) => !dismissedIds.includes(b.id));

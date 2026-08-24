@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { SupplyHub, RoadDisruption, Shipment, SimulatedHazardInput, RegisterShipmentInput } from '@/types';
+import { SupplyHub, RoadDisruption, Shipment, SimulatedHazardInput, RegisterShipmentInput, SystemBroadcast } from '@/types';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -1055,7 +1055,10 @@ export type RealtimeSyncEvent =
   | { type: 'shipment_telemetry'; payload: { id: string; telemetry: any } }
   | { type: 'hazard_insert'; payload: RoadDisruption }
   | { type: 'hazard_update'; payload: RoadDisruption }
-  | { type: 'hazard_delete'; payload: string };
+  | { type: 'hazard_delete'; payload: string }
+  | { type: 'broadcast_insert'; payload: SystemBroadcast }
+  | { type: 'broadcast_update'; payload: SystemBroadcast }
+  | { type: 'broadcast_delete'; payload: string };
 
 let crossTabChannel: BroadcastChannel | null = null;
 if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
@@ -1363,6 +1366,104 @@ export function subscribeToAllHazardsRealtime(
       });
     } catch (err) {
       console.warn('Realtime hazards subscription error:', err);
+    }
+  }
+
+  return () => {
+    cleanupFns.forEach((fn) => fn());
+  };
+}
+
+// Supabase Realtime WebSocket subscription for emergency system broadcasts
+export function subscribeToAllBroadcastsRealtime(
+  onInsert: (broadcast: SystemBroadcast) => void,
+  onUpdate: (broadcast: SystemBroadcast) => void,
+  onDelete: (id: string) => void
+) {
+  const cleanupFns: Array<() => void> = [];
+
+  // 1. Native Cross-Tab BroadcastChannel Listener (0ms instant cross-window sync)
+  if (crossTabChannel) {
+    const handleBroadcastMsg = (ev: MessageEvent) => {
+      const data = ev.data as RealtimeSyncEvent;
+      if (!data) return;
+
+      if (data.type === 'broadcast_insert') {
+        onInsert(data.payload);
+      } else if (data.type === 'broadcast_update') {
+        onUpdate(data.payload);
+      } else if (data.type === 'broadcast_delete') {
+        onDelete(data.payload);
+      }
+    };
+
+    crossTabChannel.addEventListener('message', handleBroadcastMsg);
+    cleanupFns.push(() => crossTabChannel?.removeEventListener('message', handleBroadcastMsg));
+  }
+
+  // 2. Storage event fallback listener
+  if (typeof window !== 'undefined') {
+    const handleStorageEvent = (ev: StorageEvent) => {
+      if (ev.key === 'ner_logistics_sync_pulse' && ev.newValue) {
+        try {
+          const parsed = JSON.parse(ev.newValue);
+          const data = parsed.event as RealtimeSyncEvent;
+          if (data.type === 'broadcast_insert') {
+            onInsert(data.payload);
+          } else if (data.type === 'broadcast_update') {
+            onUpdate(data.payload);
+          } else if (data.type === 'broadcast_delete') {
+            onDelete(data.payload);
+          }
+        } catch (e) {}
+      }
+    };
+    window.addEventListener('storage', handleStorageEvent);
+    cleanupFns.push(() => window.removeEventListener('storage', handleStorageEvent));
+  }
+
+  // 3. Supabase Realtime WebSocket postgres_changes + Broadcast channel
+  if (supabase) {
+    try {
+      console.log('[SUPABASE REALTIME] Subscribing to public:system_broadcasts...');
+      const channel = supabase
+        .channel('realtime-system-broadcasts-channel')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'system_broadcasts' },
+          (payload: any) => {
+            console.log('[SUPABASE REALTIME SYSTEM_BROADCASTS EVENT]:', payload.eventType, payload);
+            if (payload.eventType === 'INSERT' && payload.new) {
+              onInsert(payload.new as SystemBroadcast);
+            } else if (payload.eventType === 'UPDATE' && payload.new) {
+              if (payload.new.is_active === false) {
+                onDelete(payload.new.id);
+              } else {
+                onUpdate(payload.new as SystemBroadcast);
+              }
+            } else if (payload.eventType === 'DELETE' && payload.old) {
+              onDelete(payload.old.id);
+            }
+          }
+        )
+        .on('broadcast', { event: 'broadcast_insert' }, (msg: any) => {
+          if (msg.payload) onInsert(msg.payload);
+        })
+        .on('broadcast', { event: 'broadcast_update' }, (msg: any) => {
+          if (msg.payload) onUpdate(msg.payload);
+        })
+        .on('broadcast', { event: 'broadcast_delete' }, (msg: any) => {
+          if (msg.payload && onDelete) onDelete(String(msg.payload));
+        })
+        .subscribe((status) => {
+          console.log('[SUPABASE REALTIME SYSTEM_BROADCASTS CHANNEL STATUS]:', status);
+        });
+
+      cleanupFns.push(() => {
+        supabase.removeChannel(channel);
+      });
+    } catch (err) {
+      console.warn('Realtime system broadcasts subscription error:', err);
     }
   }
 

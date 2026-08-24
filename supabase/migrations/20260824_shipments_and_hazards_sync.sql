@@ -128,13 +128,43 @@ CREATE POLICY "Allow update on road_disruptions" ON public.road_disruptions FOR 
 DROP POLICY IF EXISTS "Allow delete on road_disruptions" ON public.road_disruptions;
 CREATE POLICY "Allow delete on road_disruptions" ON public.road_disruptions FOR DELETE USING (true);
 
+-- Table: public.system_broadcasts (Emergency bulletins & advisories)
+CREATE TABLE IF NOT EXISTS public.system_broadcasts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    severity TEXT NOT NULL DEFAULT 'WARNING',
+    agency TEXT DEFAULT 'Disaster Management Command',
+    issued_by_name TEXT DEFAULT 'Official Command Desk',
+    affected_region TEXT DEFAULT 'Northeast Regional Corridor',
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.system_broadcasts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow global select on system_broadcasts" ON public.system_broadcasts;
+CREATE POLICY "Allow global select on system_broadcasts" ON public.system_broadcasts FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow insert on system_broadcasts" ON public.system_broadcasts;
+CREATE POLICY "Allow insert on system_broadcasts" ON public.system_broadcasts FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow update on system_broadcasts" ON public.system_broadcasts;
+CREATE POLICY "Allow update on system_broadcasts" ON public.system_broadcasts FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow delete on system_broadcasts" ON public.system_broadcasts;
+CREATE POLICY "Allow delete on system_broadcasts" ON public.system_broadcasts FOR DELETE USING (true);
+
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
         ALTER PUBLICATION supabase_realtime ADD TABLE public.shipments;
         ALTER PUBLICATION supabase_realtime ADD TABLE public.road_disruptions;
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.system_broadcasts;
         IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'hazards') THEN
             ALTER PUBLICATION supabase_realtime ADD TABLE public.hazards;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'advisories') THEN
+            ALTER PUBLICATION supabase_realtime ADD TABLE public.advisories;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'broadcasts') THEN
+            ALTER PUBLICATION supabase_realtime ADD TABLE public.broadcasts;
         END IF;
         ALTER PUBLICATION supabase_realtime ADD TABLE public.supply_hubs;
     END IF;

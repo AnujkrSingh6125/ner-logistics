@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase, broadcastCrossSessionEvent } from '@/lib/supabaseClient';
 import { SystemBroadcast, BroadcastSeverity } from '@/types';
 
 // Regional Baseline Warnings Fallback (starts empty for clean dynamic state)
@@ -33,11 +33,17 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const userRole = request.headers.get('x-user-role');
+    const userRole = (request.headers.get('x-user-role') || '').trim();
     const userAgency = request.headers.get('x-user-agency') || 'Disaster Management Command';
     const userName = request.headers.get('x-user-name') || 'Official Command Desk';
 
-    if (userRole !== 'gov_official') {
+    const isGov =
+      userRole === 'gov_official' ||
+      userRole === 'GOV_AUTHORITY' ||
+      userRole === 'government_official' ||
+      userRole === 'admin';
+
+    if (!isGov) {
       return NextResponse.json(
         { error: 'Access Denied (403): Emergency system broadcasts are strictly restricted to verified Government & Defense Command Officials.' },
         { status: 403 }
@@ -93,6 +99,7 @@ export async function POST(request: NextRequest) {
     }
 
     memoryBroadcasts = [newBroadcast, ...memoryBroadcasts];
+    broadcastCrossSessionEvent({ type: 'broadcast_insert', payload: newBroadcast });
 
     return NextResponse.json({
       success: true,
@@ -118,6 +125,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     memoryBroadcasts = memoryBroadcasts.filter((b) => b.id !== id);
+    broadcastCrossSessionEvent({ type: 'broadcast_delete', payload: id });
 
     return NextResponse.json({ success: true, message: 'Broadcast resolved.' });
   } catch (error: any) {
