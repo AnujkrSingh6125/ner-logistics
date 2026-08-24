@@ -6,12 +6,15 @@ import {
   DisasterResilientRouteResponse,
   RouteCalculationResult,
   CargoTier,
+  Shipment,
 } from '@/types';
 import { calculateRoute } from '@/lib/api';
 import {
   CARGO_MANIFEST_PRESETS,
   calculateCargoAdjustedETA,
 } from '@/lib/spatial';
+import { useAuth } from '@/context/AuthContext';
+import RegisterShipmentModal from './RegisterShipmentModal';
 import {
   Navigation,
   ArrowRightLeft,
@@ -33,6 +36,8 @@ import {
   Globe,
   FileText,
   LocateFixed,
+  Truck,
+  Lock,
 } from 'lucide-react';
 
 interface RoutePlannerProps {
@@ -60,6 +65,7 @@ interface RoutePlannerProps {
   onStartNavigation?: () => void;
   onStopNavigation?: () => void;
   onToggleGps?: () => void;
+  onShipmentRegistered?: (shipment: Shipment) => void;
 }
 
 export default function RoutePlanner({
@@ -86,10 +92,13 @@ export default function RoutePlanner({
   onStartNavigation,
   onStopNavigation,
   onToggleGps,
+  onShipmentRegistered,
 }: RoutePlannerProps) {
+  const { canDispatch, openAuthModal } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showSteps, setShowSteps] = useState(false);
   const [profile, setProfile] = useState<'driving' | 'truck'>('driving');
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
 
   const cargoConfig = CARGO_MANIFEST_PRESETS[cargoTier];
 
@@ -370,6 +379,34 @@ export default function RoutePlanner({
           )}
         </div>
 
+        {/* Supply Hub Dispatch RBAC Control */}
+        {!canDispatch ? (
+          <div className="p-3 bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 rounded-xl flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
+              <Lock className="w-4 h-4 shrink-0 text-amber-500" />
+              <span className="font-medium text-[11px]">
+                Restricted: Only Verified Supply Hub Accounts Can Dispatch Active Shipments.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => openAuthModal('hub')}
+              className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-[10px] whitespace-nowrap transition shadow-sm"
+            >
+              Hub Login
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setIsRegisterModalOpen(true)}
+            className="w-full py-2.5 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-bold text-xs shadow-lg transition flex items-center justify-center gap-2 border border-emerald-400/30"
+          >
+            <Truck className="w-4 h-4" />
+            <span>Register & Dispatch Active Convoy</span>
+          </button>
+        )}
+
         {/* Start Live GPS Navigation CTA */}
         {routeData && onStartNavigation && (
           <button
@@ -390,6 +427,17 @@ export default function RoutePlanner({
           </button>
         )}
       </div>
+
+      <RegisterShipmentModal
+        isOpen={isRegisterModalOpen}
+        onClose={() => setIsRegisterModalOpen(false)}
+        onShipmentCreated={(shipment) => {
+          onShipmentRegistered?.(shipment);
+        }}
+        defaultOriginHub={originHub}
+        defaultDestHub={destHub}
+        defaultCargoTier={cargoTier}
+      />
 
       {/* Calculated Route Results & Hazard Analysis */}
       {routeData && (

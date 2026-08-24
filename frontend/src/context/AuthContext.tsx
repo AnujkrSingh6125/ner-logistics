@@ -213,8 +213,13 @@ interface AuthContextType {
   role: UserRole | null;
   isLoggedIn: boolean;
   isGovOfficial: boolean;
+  isGovAuthority: boolean;
   isHubOperator: boolean;
+  isSupplyHub: boolean;
   isPublicUser: boolean;
+  isCitizenDriver: boolean;
+  canDispatch: boolean;
+  canObserveTelemetry: boolean;
   authModalOpen: boolean;
   authModalTab: 'public' | 'gov' | 'hub';
   pendingSignup: PendingSignup | null;
@@ -803,9 +808,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     closeAuthModal();
   };
 
-  const isGovOfficial = user?.role === 'gov_official';
-  const isHubOperator = user?.role === 'hub_operator';
-  const isPublicUser = user?.role === 'citizen' || user?.role === 'driver' || user?.role === 'public_user';
+  const isGovOfficial = user?.role === 'gov_official' || user?.role === 'GOV_AUTHORITY';
+  const isGovAuthority = isGovOfficial;
+  const isHubOperator = user?.role === 'hub_operator' || user?.role === 'SUPPLY_HUB';
+  const isSupplyHub = isHubOperator;
+  const isPublicUser =
+    user?.role === 'citizen' ||
+    user?.role === 'driver' ||
+    user?.role === 'public_user' ||
+    user?.role === 'CITIZEN_DRIVER';
+  const isCitizenDriver = isPublicUser;
+
+  const canDispatch = isSupplyHub;
+  const canObserveTelemetry = isSupplyHub || isGovAuthority;
 
   return (
     <AuthContext.Provider
@@ -814,8 +829,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: user?.role || null,
         isLoggedIn: !!user,
         isGovOfficial,
+        isGovAuthority,
         isHubOperator,
+        isSupplyHub,
         isPublicUser,
+        isCitizenDriver,
+        canDispatch,
+        canObserveTelemetry,
         authModalOpen,
         authModalTab,
         pendingSignup,

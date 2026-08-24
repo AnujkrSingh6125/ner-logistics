@@ -18,6 +18,7 @@ import {
   RoadDisruption,
   DisasterResilientRouteResponse,
   LiveJourney,
+  Shipment,
 } from '@/types';
 import { BASELINE_SUPPLY_HUBS, BASELINE_DISRUPTIONS } from '@/lib/supabaseClient';
 import { useTheme } from '@/context/ThemeContext';
@@ -294,7 +295,7 @@ function CollapsibleCorridorLegend({
   );
 }
 
-// Map Controller for Camera Center, Follow Mode & FitBounds
+// Map Controller for Camera Center, Follow Mode, Fleet Tracking & FitBounds
 function MapController({
   center,
   zoom,
@@ -302,6 +303,7 @@ function MapController({
   userLocation,
   isNavigating,
   followMode,
+  trackedShipment,
 }: {
   center: [number, number];
   zoom: number;
@@ -309,11 +311,26 @@ function MapController({
   userLocation?: [number, number] | null;
   isNavigating?: boolean;
   followMode?: boolean;
+  trackedShipment?: Shipment | null;
 }) {
   const map = useMap();
 
   useEffect(() => {
     try {
+      if (
+        trackedShipment &&
+        trackedShipment.current_lat &&
+        trackedShipment.current_lng &&
+        !isNaN(trackedShipment.current_lat) &&
+        !isNaN(trackedShipment.current_lng)
+      ) {
+        map.flyTo([trackedShipment.current_lat, trackedShipment.current_lng], 13, {
+          animate: true,
+          duration: 1.2,
+        });
+        return;
+      }
+
       if (
         userLocation &&
         !isNaN(userLocation[0]) &&
@@ -344,7 +361,7 @@ function MapController({
     } catch (err) {
       console.warn('MapController camera update warning:', err);
     }
-  }, [center, zoom, routeCoordinates, userLocation, isNavigating, followMode, map]);
+  }, [center, zoom, routeCoordinates, userLocation, isNavigating, followMode, trackedShipment, map]);
 
   return null;
 }
@@ -358,7 +375,7 @@ function MapSimulationClickHandler({
   onMapClick?: (coords: { latitude: number; longitude: number }) => void;
 }) {
   useMapEvents({
-    click(e) {
+    click: (e) => {
       if (isSimulating && onMapClick) {
         onMapClick({
           latitude: e.latlng.lat,
@@ -394,6 +411,8 @@ interface MapClientProps {
   followMode?: boolean;
   isSimulated?: boolean;
   threatAlert?: ThreatAlertData | null;
+  trackedShipment?: Shipment | null;
+  fleetShipments?: Shipment[];
   onSelectHub?: (hub: SupplyHub) => void;
   onSetOrigin?: (hub: SupplyHub) => void;
   onSetDestination?: (hub: SupplyHub) => void;
@@ -429,6 +448,8 @@ export default function MapClient({
   followMode = true,
   isSimulated = false,
   threatAlert,
+  trackedShipment,
+  fleetShipments,
   onSelectHub,
   onSetOrigin,
   onSetDestination,
@@ -642,6 +663,39 @@ export default function MapClient({
       iconSize: [28, 28],
       iconAnchor: [14, 14],
       popupAnchor: [0, -14],
+    });
+  };
+
+  // Custom DivIcon for Active Tracked Fleet Shipments
+  const createFleetShipmentIcon = (shipment: Shipment, isTracked: boolean) => {
+    const heading = shipment.heading || 0;
+    const color = isTracked ? '#06b6d4' : '#10b981';
+    const pulse = isTracked
+      ? `<div class="absolute w-10 h-10 rounded-full bg-cyan-400/30 animate-ping"></div>
+         <div class="absolute w-7 h-7 rounded-full bg-cyan-500/40 animate-pulse"></div>`
+      : '';
+
+    const html = `
+      <div class="relative flex items-center justify-center pointer-events-none" style="width: 44px; height: 44px;">
+        ${pulse}
+        <div class="relative z-10 w-8 h-8 rounded-xl flex items-center justify-center shadow-2xl border-2 transition-transform duration-300 pointer-events-auto"
+             style="background: linear-gradient(135deg, #0f172a, #1e293b); border-color: ${color}; transform: rotate(${heading}deg);">
+          <svg class="w-4 h-4" style="color: ${color};" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+          </svg>
+        </div>
+        <div class="absolute -bottom-4 bg-slate-900/90 text-[8px] font-mono font-bold text-cyan-200 px-1.5 py-0.2 rounded border border-cyan-700/60 shadow-lg whitespace-nowrap pointer-events-none">
+          ${shipment.tracking_code}
+        </div>
+      </div>
+    `;
+
+    return L.divIcon({
+      html,
+      className: 'custom-fleet-shipment-icon',
+      iconSize: [44, 44],
+      iconAnchor: [22, 22],
+      popupAnchor: [0, -22],
     });
   };
 
@@ -903,6 +957,7 @@ export default function MapClient({
           userLocation={userLocation}
           isNavigating={isNavigating}
           followMode={followMode}
+          trackedShipment={trackedShipment}
         />
 
         {/* Unified Vertical Left Floating Glass Toolbar */}
@@ -1173,6 +1228,70 @@ export default function MapClient({
             </Popup>
           </Marker>
         ))}
+
+        {/* 5b. Active Convoy Fleet Shipments & Pulse Telemetry */}
+        {fleetShipments &&
+          fleetShipments.map((s) => {
+            if (!s.current_lat || !s.current_lng || isNaN(s.current_lat) || isNaN(s.current_lng))
+              return null;
+            const isTracked = trackedShipment?.id === s.id;
+
+            return (
+              <React.Fragment key={`fleet-shipment-${s.id}`}>
+                {isTracked && (
+                  <Circle
+                    center={[s.current_lat, s.current_lng]}
+                    radius={500}
+                    pathOptions={{
+                      color: '#06b6d4',
+                      fillColor: '#22d3ee',
+                      fillOpacity: 0.15,
+                      weight: 1.5,
+                    }}
+                  />
+                )}
+                <Marker
+                  position={[s.current_lat, s.current_lng]}
+                  icon={createFleetShipmentIcon(s, isTracked)}
+                  zIndexOffset={isTracked ? 3000 : 1500}
+                >
+                  <Popup>
+                    <div className="p-2 text-xs text-slate-100 min-w-[200px] space-y-1.5">
+                      <div className="flex items-center justify-between border-b border-slate-700 pb-1">
+                        <span className="font-mono font-bold text-cyan-400">{s.tracking_code}</span>
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+                          {s.current_status}
+                        </span>
+                      </div>
+                      {s.driver_name && (
+                        <div className="text-[11px] text-slate-200 flex items-center gap-1 font-semibold">
+                          <span>👤 {s.driver_name}</span>
+                          {s.driver_id && (
+                            <span className="font-mono text-[9px] text-slate-400">({s.driver_id})</span>
+                          )}
+                        </div>
+                      )}
+                      <div className="text-[10px] text-slate-300">
+                        <div>
+                          📍 {s.origin_name} → {s.destination_name}
+                        </div>
+                        {s.speed !== undefined && (
+                          <div className="text-teal-400 font-mono">
+                            Speed: {s.speed} km/h • Heading: {s.heading || 0}°
+                          </div>
+                        )}
+                        {s.cargo_manifest && (
+                          <div className="text-slate-400 line-clamp-1 italic pt-0.5">
+                            📦 {s.cargo_manifest}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </Popup>
+                </Marker>
+              </React.Fragment>
+            );
+          })}
 
         {/* 6. Live User / Convoy GPS Radar Marker */}
         {isGpsEnabled && userLocation && !isNaN(userLocation[0]) && !isNaN(userLocation[1]) && (

@@ -1,4 +1,12 @@
-export type UserRole = 'public_user' | 'citizen' | 'driver' | 'gov_official' | 'hub_operator';
+export type UserRole =
+  | 'CITIZEN_DRIVER'
+  | 'SUPPLY_HUB'
+  | 'GOV_AUTHORITY'
+  | 'public_user'
+  | 'citizen'
+  | 'driver'
+  | 'gov_official'
+  | 'hub_operator';
 
 export interface ClientUser {
   id: string;
@@ -370,18 +378,52 @@ export interface SimulatedHazardInput {
 
 export type CargoType = 'MEDICINE' | 'PERISHABLE_FOOD' | 'FUEL' | 'GENERAL';
 
+export type ShipmentStatus = 'QUEUED' | 'IN_TRANSIT' | 'REROUTED' | 'DELIVERED' | 'DISRUPTED' | 'DELAYED';
+
 export interface Shipment {
   id: string;
   tracking_code: string;
+  driver_id?: string;
+  driver_name?: string;
   cargo_type: CargoType;
+  cargo_manifest?: string;
+  cargo_tier?: CargoTier;
   priority_level: number;
   origin_hub_id?: string;
   destination_hub_id?: string;
   origin_name?: string;
   destination_name?: string;
-  current_status: 'IN_TRANSIT' | 'REROUTED' | 'DELIVERED' | 'DELAYED';
+  origin?: { name: string; latitude: number; longitude: number } | string;
+  destination?: { name: string; latitude: number; longitude: number } | string;
+  current_status: ShipmentStatus;
+  current_lat?: number;
+  current_lng?: number;
+  heading?: number;
+  speed?: number;
+  speed_kmh?: number;
   weight_tonnes: number;
+  dispatched_by_hub_id?: string;
   notes?: string;
   created_at?: string;
+  last_ping_at?: string;
   updated_at?: string;
+}
+
+export interface RegisterShipmentInput {
+  driver_name: string;
+  driver_id: string;
+  origin_hub_id: string;
+  origin_name: string;
+  origin_lat?: number;
+  origin_lng?: number;
+  destination_hub_id: string;
+  destination_name: string;
+  destination_lat?: number;
+  destination_lng?: number;
+  cargo_type: CargoType;
+  cargo_tier: CargoTier;
+  cargo_manifest: string;
+  weight_tonnes: number;
+  priority_level?: number;
+  notes?: string;
 }

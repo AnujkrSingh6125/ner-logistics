@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { SupplyHub, RoadDisruption, Shipment, SimulatedHazardInput } from '@/types';
+import { SupplyHub, RoadDisruption, Shipment, SimulatedHazardInput, RegisterShipmentInput } from '@/types';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -156,7 +156,103 @@ let simulatedDisruptionsMemory: RoadDisruption[] = [];
 export const FALLBACK_SUPPLY_HUBS = BASELINE_SUPPLY_HUBS;
 export const FALLBACK_DISRUPTIONS: RoadDisruption[] = [];
 
-export const FALLBACK_SHIPMENTS: Shipment[] = [];
+export const FALLBACK_SHIPMENTS: Shipment[] = [
+  {
+    id: 'shp-convoy-01',
+    tracking_code: 'NER-CVY-8841',
+    driver_id: 'NER-CIT-10492',
+    driver_name: 'Rajesh Borah',
+    cargo_type: 'MEDICINE',
+    cargo_tier: 'TIER_1_CRITICAL',
+    cargo_manifest: 'Emergency Pediatric Vaccines & Antivenom Serum',
+    priority_level: 5,
+    origin_name: 'Guwahati Central Strategic Warehouse',
+    destination_name: 'Shillong Highland Transit Terminal',
+    origin: {
+      name: 'Guwahati Central Strategic Warehouse',
+      latitude: 26.1445,
+      longitude: 91.7362,
+    },
+    destination: {
+      name: 'Shillong Highland Transit Terminal',
+      latitude: 25.5788,
+      longitude: 91.8933,
+    },
+    current_status: 'IN_TRANSIT',
+    current_lat: 25.9124,
+    current_lng: 91.8214,
+    heading: 145,
+    speed: 48,
+    speed_kmh: 48,
+    weight_tonnes: 4.2,
+    created_at: new Date(Date.now() - 3600000).toISOString(),
+    last_ping_at: new Date().toISOString(),
+  },
+  {
+    id: 'shp-convoy-02',
+    tracking_code: 'NER-CVY-9923',
+    driver_id: 'NER-CIT-44821',
+    driver_name: 'Tsering Dorjee',
+    cargo_type: 'PERISHABLE_FOOD',
+    cargo_tier: 'TIER_2_ESSENTIAL',
+    cargo_manifest: 'High-Altitude Ration Packs & Potable Water',
+    priority_level: 4,
+    origin_name: 'Dimapur Transshipment Depot',
+    destination_name: 'Kohima Buffer Depot',
+    origin: {
+      name: 'Dimapur Transshipment Depot',
+      latitude: 25.9064,
+      longitude: 93.7279,
+    },
+    destination: {
+      name: 'Kohima Buffer Depot',
+      latitude: 25.6751,
+      longitude: 94.1086,
+    },
+    current_status: 'IN_TRANSIT',
+    current_lat: 25.7821,
+    current_lng: 93.9142,
+    heading: 98,
+    speed: 42,
+    speed_kmh: 42,
+    weight_tonnes: 8.5,
+    created_at: new Date(Date.now() - 7200000).toISOString(),
+    last_ping_at: new Date().toISOString(),
+  },
+  {
+    id: 'shp-convoy-03',
+    tracking_code: 'NER-CVY-3310',
+    driver_id: 'NER-CIT-77192',
+    driver_name: 'Vikram Sangma',
+    cargo_type: 'FUEL',
+    cargo_tier: 'TIER_3_BULK',
+    cargo_manifest: 'Aviation & Diesel Fuel Reserves for Backup Generators',
+    priority_level: 3,
+    origin_name: 'Silchar Barak Valley Hub',
+    destination_name: 'Aizawl Southern Relief Hub',
+    origin: {
+      name: 'Silchar Barak Valley Hub',
+      latitude: 24.8333,
+      longitude: 92.7789,
+    },
+    destination: {
+      name: 'Aizawl Southern Relief Hub',
+      latitude: 23.7271,
+      longitude: 92.7176,
+    },
+    current_status: 'REROUTED',
+    current_lat: 24.3129,
+    current_lng: 92.7418,
+    heading: 190,
+    speed: 36,
+    speed_kmh: 36,
+    weight_tonnes: 12.0,
+    created_at: new Date(Date.now() - 10800000).toISOString(),
+    last_ping_at: new Date().toISOString(),
+  },
+];
+
+let activeShipmentsMemory: Shipment[] = [...FALLBACK_SHIPMENTS];
 
 // Fetch Supply Hubs (Supabase with Fallback)
 export async function fetchSupplyHubs(): Promise<SupplyHub[]> {
@@ -300,24 +396,233 @@ export async function resetSimulatedDisruptions(): Promise<RoadDisruption[]> {
   return BASELINE_DISRUPTIONS;
 }
 
-// Fetch Shipments (Supabase with Fallback)
+// Fetch Shipments (Combines Supabase with local memory reactive fleet)
 export async function fetchShipments(): Promise<Shipment[]> {
+  let dbList: Shipment[] = [];
   if (supabase) {
     try {
       const { data, error } = await supabase
         .from('shipments')
-        .select('*, origin_hub:origin_hub_id(name), destination_hub:destination_hub_id(name)')
-        .order('priority_level', { ascending: false });
+        .select('*')
+        .order('created_at', { ascending: false });
       if (!error && data && data.length > 0) {
-        return data.map((item: any) => ({
+        dbList = data.map((item: any) => ({
           ...item,
-          origin_name: item.origin_hub?.name || 'Hub Origin',
-          destination_name: item.destination_hub?.name || 'Hub Destination',
+          origin_name: item.origin_name || (typeof item.origin === 'object' ? item.origin?.name : item.origin) || 'Origin Hub',
+          destination_name: item.destination_name || (typeof item.destination === 'object' ? item.destination?.name : item.destination) || 'Destination Hub',
         })) as Shipment[];
       }
     } catch (err) {
       console.warn('Supabase fetch error, using regional defaults:', err);
     }
   }
-  return FALLBACK_SHIPMENTS;
+
+  const merged = [...activeShipmentsMemory, ...dbList];
+  const unique = Array.from(new Map(merged.map((s) => [s.id, s])).values());
+  return unique;
+}
+
+// Insert Shipment strictly for Authorized Supply Hub Accounts
+export async function insertShipment(
+  input: RegisterShipmentInput,
+  creatorHubId?: string
+): Promise<Shipment> {
+  const trackingCode = `NER-SHP-${Math.floor(1000 + Math.random() * 9000)}`;
+  const newShipment: Shipment = {
+    id: `shp-${Date.now()}`,
+    tracking_code: trackingCode,
+    driver_id: input.driver_id || `NER-CIT-${Math.floor(10000 + Math.random() * 90000)}`,
+    driver_name: input.driver_name,
+    origin_hub_id: input.origin_hub_id,
+    origin_name: input.origin_name,
+    origin: {
+      name: input.origin_name,
+      latitude: input.origin_lat || 26.1445,
+      longitude: input.origin_lng || 91.7362,
+    },
+    destination_hub_id: input.destination_hub_id,
+    destination_name: input.destination_name,
+    destination: {
+      name: input.destination_name,
+      latitude: input.destination_lat || 25.5788,
+      longitude: input.destination_lng || 91.8933,
+    },
+    cargo_type: input.cargo_type,
+    cargo_tier: input.cargo_tier,
+    cargo_manifest: input.cargo_manifest,
+    priority_level:
+      input.priority_level ||
+      (input.cargo_tier === 'TIER_1_CRITICAL' ? 5 : input.cargo_tier === 'TIER_2_ESSENTIAL' ? 4 : 3),
+    weight_tonnes: Number(input.weight_tonnes) || 5,
+    current_status: 'IN_TRANSIT',
+    current_lat: input.origin_lat || 26.1445,
+    current_lng: input.origin_lng || 91.7362,
+    heading: 0,
+    speed: 45,
+    speed_kmh: 45,
+    dispatched_by_hub_id: creatorHubId || input.origin_hub_id,
+    notes: input.notes,
+    created_at: new Date().toISOString(),
+    last_ping_at: new Date().toISOString(),
+  };
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('shipments')
+        .insert([
+          {
+            tracking_code: newShipment.tracking_code,
+            driver_id: newShipment.driver_id,
+            driver_name: newShipment.driver_name,
+            origin_hub_id: newShipment.origin_hub_id,
+            destination_hub_id: newShipment.destination_hub_id,
+            origin_name: newShipment.origin_name,
+            destination_name: newShipment.destination_name,
+            origin: newShipment.origin,
+            destination: newShipment.destination,
+            cargo_type: newShipment.cargo_type,
+            cargo_tier: newShipment.cargo_tier,
+            cargo_manifest: newShipment.cargo_manifest,
+            priority_level: newShipment.priority_level,
+            weight_tonnes: newShipment.weight_tonnes,
+            current_status: newShipment.current_status,
+            current_lat: newShipment.current_lat,
+            current_lng: newShipment.current_lng,
+            heading: newShipment.heading,
+            speed: newShipment.speed,
+            dispatched_by_hub_id: newShipment.dispatched_by_hub_id,
+            notes: newShipment.notes,
+            created_at: newShipment.created_at,
+            last_ping_at: newShipment.last_ping_at,
+          },
+        ])
+        .select()
+        .single();
+
+      if (!error && data) {
+        newShipment.id = data.id;
+      } else if (error) {
+        console.warn('[SUPABASE SHIPMENT INSERT WARN]:', error.message);
+      }
+    } catch (err) {
+      console.warn('Supabase shipment insert exception:', err);
+    }
+  }
+
+  activeShipmentsMemory = [newShipment, ...activeShipmentsMemory];
+  return newShipment;
+}
+
+// Update Real-Time Driver Telemetry for Active Shipment
+export async function updateShipmentTelemetry(
+  shipmentId: string,
+  telemetry: {
+    current_lat: number;
+    current_lng: number;
+    heading?: number | null;
+    speed?: number | null;
+  }
+): Promise<boolean> {
+  activeShipmentsMemory = activeShipmentsMemory.map((s) => {
+    if (s.id === shipmentId) {
+      return {
+        ...s,
+        current_lat: telemetry.current_lat,
+        current_lng: telemetry.current_lng,
+        heading: telemetry.heading ?? s.heading,
+        speed: telemetry.speed ?? s.speed,
+        speed_kmh: telemetry.speed ?? s.speed,
+        last_ping_at: new Date().toISOString(),
+      };
+    }
+    return s;
+  });
+
+  if (supabase) {
+    try {
+      await supabase
+        .from('shipments')
+        .update({
+          current_lat: telemetry.current_lat,
+          current_lng: telemetry.current_lng,
+          heading: telemetry.heading,
+          speed: telemetry.speed,
+          last_ping_at: new Date().toISOString(),
+        })
+        .eq('id', shipmentId);
+      return true;
+    } catch (err) {
+      console.warn('Supabase update shipment telemetry error:', err);
+    }
+  }
+  return true;
+}
+
+// Supabase Realtime WebSocket subscription for a single shipment
+export function subscribeToShipmentRealtime(
+  shipmentId: string,
+  onUpdate: (updatedShipment: Shipment) => void
+) {
+  if (!supabase) return () => {};
+
+  try {
+    const channel = supabase
+      .channel(`shipment-${shipmentId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'shipments',
+          filter: `id=eq.${shipmentId}`,
+        },
+        (payload: any) => {
+          if (payload.new) {
+            onUpdate(payload.new as Shipment);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  } catch (err) {
+    console.warn('Realtime subscription error:', err);
+    return () => {};
+  }
+}
+
+// Supabase Realtime WebSocket subscription for all fleet shipments
+export function subscribeToAllShipmentsRealtime(
+  onUpdate: (shipment: Shipment) => void
+) {
+  if (!supabase) return () => {};
+
+  try {
+    const channel = supabase
+      .channel('all-shipments-telemetry')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'shipments',
+        },
+        (payload: any) => {
+          if (payload.new) {
+            onUpdate(payload.new as Shipment);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  } catch (err) {
+    console.warn('Realtime all shipments subscription error:', err);
+    return () => {};
+  }
 }

@@ -18,6 +18,8 @@ import {
   fetchSupplyHubs,
   fetchRoadDisruptions,
   fetchShipments,
+  updateShipmentTelemetry,
+  subscribeToAllShipmentsRealtime,
   BASELINE_SUPPLY_HUBS,
   BASELINE_DISRUPTIONS,
   FALLBACK_SHIPMENTS,
@@ -55,6 +57,7 @@ export default function DashboardPage() {
   const [hubs, setHubs] = useState<SupplyHub[]>(BASELINE_SUPPLY_HUBS);
   const [disruptions, setDisruptions] = useState<RoadDisruption[]>(BASELINE_DISRUPTIONS);
   const [shipments, setShipments] = useState<Shipment[]>(FALLBACK_SHIPMENTS);
+  const [trackedShipment, setTrackedShipment] = useState<Shipment | null>(null);
 
   // Selection and routing states
   const [selectedHub, setSelectedHub] = useState<SupplyHub | null>(null);
@@ -157,6 +160,57 @@ export default function DashboardPage() {
       }
     };
   }, []);
+
+  // Realtime Supabase Subscription on shipments table
+  useEffect(() => {
+    const unsub = subscribeToAllShipmentsRealtime((incomingShipment) => {
+      setShipments((prev) => {
+        const exists = prev.some((s) => s.id === incomingShipment.id);
+        if (exists) {
+          return prev.map((s) => (s.id === incomingShipment.id ? incomingShipment : s));
+        }
+        return [incomingShipment, ...prev];
+      });
+
+      setTrackedShipment((current) =>
+        current?.id === incomingShipment.id ? incomingShipment : current
+      );
+    });
+
+    return () => {
+      unsub();
+    };
+  }, []);
+
+  // Driver Telemetry Transmission Pipeline: Throttled push to Supabase shipments
+  const lastTelemetryPushRef = React.useRef<number>(0);
+  useEffect(() => {
+    if (!gps.userCoordinates || !gps.isGpsEnabled) return;
+    const [lat, lng] = gps.userCoordinates;
+    const now = Date.now();
+
+    // Throttled: Push every 3.5 seconds
+    if (now - lastTelemetryPushRef.current > 3500) {
+      lastTelemetryPushRef.current = now;
+
+      // Find shipment assigned to driver or active
+      const activeConvoy = shipments.find(
+        (s) =>
+          (user?.citizen_uid && s.driver_id === user.citizen_uid) ||
+          (user?.full_name && s.driver_name === user.full_name) ||
+          s.current_status === 'IN_TRANSIT'
+      );
+
+      if (activeConvoy) {
+        updateShipmentTelemetry(activeConvoy.id, {
+          current_lat: lat,
+          current_lng: lng,
+          heading: gps.heading,
+          speed: gps.speed,
+        }).catch((err) => console.warn('Telemetry transmission error:', err));
+      }
+    }
+  }, [gps.userCoordinates, gps.heading, gps.speed, gps.isGpsEnabled, shipments, user]);
 
   // If user logs out, turn off simulation mode automatically
   useEffect(() => {
@@ -712,6 +766,8 @@ export default function DashboardPage() {
                 followMode={gps.followMode}
                 isSimulated={gps.isSimulated}
                 threatAlert={threatAlert}
+                trackedShipment={trackedShipment}
+                fleetShipments={shipments}
                 onSelectHub={(hub) => setSelectedHub(hub)}
                 onSetOrigin={(hub) => setOriginHub(hub)}
                 onSetDestination={(hub) => setDestHub(hub)}
@@ -769,6 +825,10 @@ export default function DashboardPage() {
               onStartNavigation={handleStartNavigation}
               onStopNavigation={gps.stopNavigation}
               onToggleGps={handleToggleGps}
+              onShipmentRegistered={(newShipment) => {
+                setShipments((prev) => [newShipment, ...prev]);
+                setTrackedShipment(newShipment);
+              }}
             />
 
             <DisruptionAlerts
@@ -783,7 +843,11 @@ export default function DashboardPage() {
               }}
             />
 
-            <ShipmentFeed shipments={shipments} />
+            <ShipmentFeed
+              shipments={shipments}
+              selectedShipmentId={trackedShipment?.id}
+              onSelectShipment={(s) => setTrackedShipment(s)}
+            />
           </div>
         </div>
       </main>
