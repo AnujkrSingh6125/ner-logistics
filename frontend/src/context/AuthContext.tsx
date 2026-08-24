@@ -235,6 +235,7 @@ interface AuthContextType {
   resendOTP: () => Promise<{ success: boolean; message: string; otp?: string }>;
   toggleLocationSharing: () => Promise<boolean>;
   deleteAccount: () => Promise<{ success: boolean; message: string }>;
+  saveSession: (profile: UserProfile) => void;
   logout: () => void;
 }
 
@@ -918,6 +919,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         resendOTP,
         toggleLocationSharing,
         deleteAccount,
+        saveSession,
         logout,
       }}
     >

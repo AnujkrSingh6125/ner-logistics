@@ -64,6 +64,27 @@ export default function AuthModal() {
     }
   }, [pendingSignup]);
 
+  const submitVerificationCode = async (codeToVerify: string) => {
+    const clean = codeToVerify.replace(/\D/g, '');
+    if (clean.length < 6) {
+      setErrorMsg('Please enter all 6 digits of the verification code.');
+      return;
+    }
+    setErrorMsg('');
+    setSuccessMsg('');
+    setIsLoading(true);
+    try {
+      const res = await verifyEmailOTP(clean);
+      if (!res.success) {
+        setErrorMsg(res.message);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Verification confirmation failed.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleOtpDigitChange = (index: number, value: string) => {
     const clean = value.replace(/\D/g, '');
     if (!clean) {
@@ -84,6 +105,10 @@ export default function AuthModal() {
       setEmailOtpInput(newDigits.join(''));
       const nextIdx = Math.min(chars.length, 5);
       otpInputRefs.current[nextIdx]?.focus();
+
+      if (newDigits.filter(Boolean).length === 6) {
+        submitVerificationCode(newDigits.join(''));
+      }
       return;
     }
 
@@ -94,6 +119,10 @@ export default function AuthModal() {
 
     if (index < 5 && clean) {
       otpInputRefs.current[index + 1]?.focus();
+    }
+
+    if (newDigits.filter(Boolean).length === 6) {
+      submitVerificationCode(newDigits.join(''));
     }
   };
 
@@ -116,6 +145,10 @@ export default function AuthModal() {
       setEmailOtpInput(newDigits.join(''));
       const focusIndex = Math.min(chars.length, 5);
       otpInputRefs.current[focusIndex]?.focus();
+
+      if (chars.length === 6) {
+        submitVerificationCode(newDigits.join(''));
+      }
     }
   };
 
@@ -205,24 +238,8 @@ export default function AuthModal() {
   // Handle Email OTP Verification
   const handleVerifyEmailOTP = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg('');
-    setSuccessMsg('');
     const code = (emailOtpInput.trim() || otpDigits.join('').trim()).replace(/\D/g, '');
-    if (code.length < 6) {
-      setErrorMsg('Please enter all 6 digits of the verification code.');
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const res = await verifyEmailOTP(code);
-      if (!res.success) {
-        setErrorMsg(res.message);
-      }
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Verification confirmation failed.');
-    } finally {
-      setIsLoading(false);
-    }
+    await submitVerificationCode(code);
   };
 
   // Handle Resend Email Code
