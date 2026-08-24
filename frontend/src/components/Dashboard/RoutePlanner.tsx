@@ -288,12 +288,12 @@ export default function RoutePlanner({
                 hubs.find((h) => h.id === e.target.value) || null;
               onSetOrigin(selected);
             }}
-            className="w-full bg-[#081020] border border-slate-700/80 text-slate-100 text-xs rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-cyan-500 focus:outline-none font-medium"
+            className="w-full bg-white dark:bg-[#081020] border border-slate-300 dark:border-slate-700/80 text-slate-900 dark:text-slate-100 text-xs rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-cyan-500 focus:outline-none font-medium"
           >
             <option value="">-- Select Origin Hub (Manual) --</option>
-            {isGpsEnabled && userLocation && (
+            {isGpsEnabled && (
               <option value="current-location">
-                📍 My Current Location (Live GPS: {userLocation[0].toFixed(3)}°, {userLocation[1].toFixed(3)}°)
+                📍 My Current Location (Live GPS{userLocation ? `: ${userLocation[0].toFixed(3)}°, ${userLocation[1].toFixed(3)}°` : ''})
               </option>
             )}
             {hubs.map((hub) => (
@@ -310,7 +310,7 @@ export default function RoutePlanner({
             type="button"
             onClick={handleSwap}
             disabled={!originHub && !destHub}
-            className="p-1.5 rounded-full bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-cyan-300 border border-slate-700/80 transition disabled:opacity-30 shadow-sm"
+            className="p-1.5 rounded-full bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-300 border border-slate-200 dark:border-slate-700/80 transition disabled:opacity-30 shadow-sm"
             title="Swap Origin & Destination"
           >
             <ArrowRightLeft className="w-3.5 h-3.5 rotate-90 md:rotate-0" />
@@ -319,7 +319,7 @@ export default function RoutePlanner({
 
         {/* Destination Hub Selector */}
         <div>
-          <label className="block text-[11px] font-medium text-slate-400 mb-1">
+          <label className="block text-[11px] font-medium text-slate-700 dark:text-slate-400 mb-1">
             Destination Strategic Hub:
           </label>
           <select
@@ -329,7 +329,7 @@ export default function RoutePlanner({
                 hubs.find((h) => h.id === e.target.value) || null;
               onSetDestination(selected);
             }}
-            className="w-full bg-[#081020] border border-slate-700/80 text-slate-100 text-xs rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-cyan-500 focus:outline-none font-medium"
+            className="w-full bg-white dark:bg-[#081020] border border-slate-300 dark:border-slate-700/80 text-slate-900 dark:text-slate-100 text-xs rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-cyan-500 focus:outline-none font-medium"
           >
             <option value="">-- Select Destination Hub --</option>
             {hubs.map((hub) => (

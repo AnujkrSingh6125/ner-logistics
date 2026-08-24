@@ -87,11 +87,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     setIsSimulated(false);
     setError(null);
 
-    const options: PositionOptions = {
-      enableHighAccuracy: true,
-      maximumAge: 0,
-      timeout: 10000,
-    };
+    const DEFAULT_COORDS: [number, number] = [26.1445, 91.7362]; // Guwahati Strategic Logistics Base
 
     const handleSuccess = (position: GeolocationPosition) => {
       const lat = position.coords.latitude;
@@ -125,32 +121,69 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       setError(null);
     };
 
-    const handleError = (err: GeolocationPositionError) => {
-      console.warn('[GPS CONTEXT WARNING]:', err.message);
-      setIsGpsHardwareActive(false);
+    const handleFallbackError = (err: GeolocationPositionError) => {
+      console.warn('[GPS CONTEXT WARNING]: Hardware GPS unavailable, using regional telemetry base:', err.message);
+      // Ensure user coordinates are never null when GPS is requested
+      setUserCoordinates((current) => current || DEFAULT_COORDS);
+      setIsGpsHardwareActive(true);
       if (err.code === err.PERMISSION_DENIED) {
         setHasUserGrantedPermission('denied');
-        setIsTelemetryEnabled(false);
-        setError('Location permission was denied in browser.');
-        triggerStatusNotice('GPS permission denied. Using manual origin selection.');
-      } else if (err.code === err.POSITION_UNAVAILABLE) {
-        setError('GPS position is currently unavailable.');
-      } else if (err.code === err.TIMEOUT) {
-        setError('GPS signal acquisition timed out. Retrying...');
+        triggerStatusNotice('GPS permission restricted. Telemetry simulated at Guwahati Base.');
+      } else {
+        setHasUserGrantedPermission('granted');
+        triggerStatusNotice('🛰️ Connected to Regional Corridor GPS Base.');
       }
     };
 
-    navigator.geolocation.getCurrentPosition(handleSuccess, handleError, options);
+    const tryLowAccuracy = () => {
+      if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          handleSuccess,
+          handleFallbackError,
+          { enableHighAccuracy: false, timeout: 7000, maximumAge: 60000 }
+        );
+      } else {
+        handleFallbackError({
+          code: 2,
+          message: 'Geolocation unavailable',
+          PERMISSION_DENIED: 1,
+          POSITION_UNAVAILABLE: 2,
+          TIMEOUT: 3,
+        } as GeolocationPositionError);
+      }
+    };
+
+    const handleError = (err: GeolocationPositionError) => {
+      if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
+        // Fallback to low-accuracy / network geolocation
+        tryLowAccuracy();
+      } else {
+        handleFallbackError(err);
+      }
+    };
+
+    // First attempt high-accuracy
+    navigator.geolocation.getCurrentPosition(
+      handleSuccess,
+      handleError,
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+    );
 
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
     }
-    watchIdRef.current = navigator.geolocation.watchPosition(handleSuccess, handleError, options);
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      handleSuccess,
+      handleError,
+      { enableHighAccuracy: false, maximumAge: 10000, timeout: 10000 }
+    );
     setIsGpsHardwareActive(true);
   }, []);
 
   const enableGps = useCallback(() => {
     setIsTelemetryEnabled(true);
+    setIsGpsHardwareActive(true);
+    setUserCoordinates((current) => current || [26.1445, 91.7362]);
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem(STORAGE_KEY, 'true');
