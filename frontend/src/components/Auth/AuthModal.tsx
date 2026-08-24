@@ -452,7 +452,7 @@ export default function AuthModal() {
 
                     <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
                       <span>Code valid for 10 minutes</span>
-                      <span className="text-cyan-400/80 font-medium">Check your email inbox</span>
+                      <span className="text-cyan-400/80 font-medium">Check Inbox & Spam / Junk folder</span>
                     </div>
                   </div>
 

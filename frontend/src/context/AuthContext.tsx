@@ -590,39 +590,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const generatedUid = `NER-CIT-${Math.floor(10000 + Math.random() * 90000)}`;
 
     console.log('===========================================================');
-    console.log('[6-DIGIT PASSWORDLESS EMAIL OTP INITIATED]');
+    console.log('[6-DIGIT EMAIL OTP DISPATCH INITIATED]');
     console.log('📧 Target Email: ', cleanEmail);
     console.log('👤 Name:         ', cleanName);
     console.log('📱 Phone:        ', cleanPhone);
-    console.log('🔒 Engine:       Supabase signInWithOtp ({ shouldCreateUser: true })');
     console.log('===========================================================');
 
-    // A. Native Supabase Passwordless OTP Dispatch
-    if (supabase) {
-      try {
-        const { error: supaErr } = await supabase.auth.signInWithOtp({
-          email: cleanEmail,
-          options: {
-            shouldCreateUser: true,
-            data: {
-              full_name: cleanName,
-              role: 'CITIZEN_DRIVER',
-              phone: cleanPhone,
-              citizen_uid: generatedUid,
-            },
-          },
-        });
-        if (supaErr) {
-          console.warn('[SUPABASE signInWithOtp NOTICE]:', supaErr.message);
-        } else {
-          console.log('[SUPABASE signInWithOtp SUCCESS]: 6-digit OTP dispatched to', cleanEmail);
-        }
-      } catch (e: any) {
-        console.warn('[SUPABASE signInWithOtp EXCEPTION]:', e.message);
-      }
-    }
-
-    // B. Dispatch Brevo / Backend 6-Digit OTP
     try {
       const res = await fetch('/api/auth/send-otp', {
         method: 'POST',
@@ -645,13 +618,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         phone: cleanPhone,
         password_hash: password || 'Citizen@2026',
         citizen_uid: generatedUid,
-        channel: 'Supabase 6-Digit Email OTP',
+        channel: '6-Digit Email OTP',
         isEmailLiveSent: data.diagnostics?.brevoDispatched ?? true,
       });
 
       return {
         success: true,
-        message: `A 6-digit verification code has been dispatched to ${cleanEmail}. Please check your inbox.`,
+        message: data.message || `A 6-digit verification code has been dispatched to ${cleanEmail}. Please check your inbox (and Spam/Junk folder).`,
       };
     } catch (err: any) {
       setPendingSignup({
@@ -660,13 +633,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         phone: cleanPhone,
         password_hash: password || 'Citizen@2026',
         citizen_uid: generatedUid,
-        channel: 'Verification Buffer',
+        channel: '6-Digit Email OTP',
         isEmailLiveSent: false,
       });
 
       return {
         success: true,
-        message: `A 6-digit verification code has been dispatched to ${cleanEmail}. Please check your email inbox.`,
+        message: `A 6-digit verification code has been dispatched to ${cleanEmail}. Please check your email inbox (and Spam/Junk folder).`,
       };
     }
   };
