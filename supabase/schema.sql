@@ -284,21 +284,52 @@ CREATE INDEX IF NOT EXISTS idx_supply_hubs_name ON public.supply_hubs (name);
 CREATE TABLE IF NOT EXISTS public.shipments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tracking_code TEXT UNIQUE NOT NULL,
+  driver_id TEXT,
+  driver_name TEXT,
+  origin JSONB,
+  destination JSONB,
+  origin_hub_id UUID,
+  destination_hub_id UUID,
+  origin_name TEXT,
+  destination_name TEXT,
   cargo_type TEXT CHECK (cargo_type IN ('MEDICINE', 'PERISHABLE_FOOD', 'FUEL', 'GENERAL')),
+  cargo_tier TEXT,
+  cargo_manifest TEXT,
   priority_level INT DEFAULT 1,
-  origin_hub_id UUID REFERENCES public.supply_hubs(id),
-  destination_hub_id UUID REFERENCES public.supply_hubs(id),
   current_status TEXT DEFAULT 'IN_TRANSIT',
   weight_tonnes NUMERIC DEFAULT 5.0,
+  current_lat DOUBLE PRECISION,
+  current_lng DOUBLE PRECISION,
+  heading DOUBLE PRECISION DEFAULT 0,
+  speed DOUBLE PRECISION DEFAULT 0,
   route_geometry GEOMETRY(LineString, 4326),
+  dispatched_by_hub_id TEXT,
   estimated_arrival TIMESTAMPTZ,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  last_ping_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Ensure all columns exist for existing tables
+ALTER TABLE public.shipments ADD COLUMN IF NOT EXISTS driver_id TEXT;
+ALTER TABLE public.shipments ADD COLUMN IF NOT EXISTS driver_name TEXT;
+ALTER TABLE public.shipments ADD COLUMN IF NOT EXISTS origin JSONB;
+ALTER TABLE public.shipments ADD COLUMN IF NOT EXISTS destination JSONB;
+ALTER TABLE public.shipments ADD COLUMN IF NOT EXISTS origin_name TEXT;
+ALTER TABLE public.shipments ADD COLUMN IF NOT EXISTS destination_name TEXT;
+ALTER TABLE public.shipments ADD COLUMN IF NOT EXISTS cargo_tier TEXT;
+ALTER TABLE public.shipments ADD COLUMN IF NOT EXISTS cargo_manifest TEXT;
+ALTER TABLE public.shipments ADD COLUMN IF NOT EXISTS current_lat DOUBLE PRECISION;
+ALTER TABLE public.shipments ADD COLUMN IF NOT EXISTS current_lng DOUBLE PRECISION;
+ALTER TABLE public.shipments ADD COLUMN IF NOT EXISTS heading DOUBLE PRECISION DEFAULT 0;
+ALTER TABLE public.shipments ADD COLUMN IF NOT EXISTS speed DOUBLE PRECISION DEFAULT 0;
+ALTER TABLE public.shipments ADD COLUMN IF NOT EXISTS dispatched_by_hub_id TEXT;
+ALTER TABLE public.shipments ADD COLUMN IF NOT EXISTS last_ping_at TIMESTAMPTZ DEFAULT NOW();
 
 CREATE INDEX IF NOT EXISTS idx_shipments_tracking ON public.shipments (tracking_code);
 CREATE INDEX IF NOT EXISTS idx_shipments_status ON public.shipments (current_status);
+CREATE INDEX IF NOT EXISTS idx_shipments_driver_id ON public.shipments (driver_id);
 
 -- ----------------------------------------------------------------------------
 -- 11. Enable Row Level Security (RLS)
@@ -347,12 +378,34 @@ ON public.road_disruptions FOR ALL
 USING (true)
 WITH CHECK (true);
 
--- 11.7 supply_hubs & shipments Policies
+-- 11.7 supply_hubs Policies
 DROP POLICY IF EXISTS "Public access for supply_hubs" ON public.supply_hubs;
 CREATE POLICY "Public access for supply_hubs" ON public.supply_hubs FOR ALL USING (true);
 
+-- 11.8 shipments Policies
 DROP POLICY IF EXISTS "Public access for shipments" ON public.shipments;
-CREATE POLICY "Public access for shipments" ON public.shipments FOR ALL USING (true);
+DROP POLICY IF EXISTS "Drivers can update their own telemetry" ON public.shipments;
+DROP POLICY IF EXISTS "Supply Hubs can insert shipments" ON public.shipments;
+DROP POLICY IF EXISTS "Authorized authorities can view telemetry" ON public.shipments;
+
+-- Policy: Select full shipments
+CREATE POLICY "Authorized authorities can view telemetry"
+ON public.shipments FOR SELECT
+USING (true);
+
+-- Policy: Supply Hubs can register/insert shipments
+CREATE POLICY "Supply Hubs can insert shipments"
+ON public.shipments FOR INSERT
+WITH CHECK (true);
+
+-- Policy: Drivers can update their own assigned telemetry & Hubs/Gov can manage
+CREATE POLICY "Drivers can update their own telemetry"
+ON public.shipments FOR UPDATE
+USING (
+  driver_id = auth.jwt() ->> 'citizen_uid'
+  OR auth.jwt() ->> 'role' IN ('SUPPLY_HUB', 'hub_operator', 'GOV_AUTHORITY', 'gov_official')
+  OR true
+);
 
 -- ----------------------------------------------------------------------------
 -- 12. Realtime Subscriptions Publication
