@@ -611,6 +611,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('📱 Phone:        ', cleanPhone);
     console.log('===========================================================');
 
+    // Pre-check registered database to prevent duplicate registration
+    try {
+      const localDB = JSON.parse(localStorage.getItem(REGISTERED_CITIZENS_KEY) || '[]');
+      const exists = localDB.some(
+        (c: any) => c.email && c.email.trim().toLowerCase() === cleanEmail
+      );
+      if (exists) {
+        return {
+          success: false,
+          message:
+            'An account with this email address already exists. Only a single user can create an account per email ID. Please Sign In instead.',
+        };
+      }
+    } catch (e) {}
+
     try {
       const res = await fetch('/api/auth/send-otp', {
         method: 'POST',
@@ -621,10 +636,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           phone: cleanPhone,
           role: 'CITIZEN_DRIVER',
           password: password || 'Citizen@2026',
+          isRegistration: true,
         }),
       });
 
       const data = await res.json();
+
+      if (!res.ok || data.success === false) {
+        return {
+          success: false,
+          message:
+            data.error ||
+            'An account with this email address already exists. Only a single user can create an account per email ID. Please sign in instead.',
+        };
+      }
 
       // Hold user strictly on dedicated OTP verification screen
       setPendingSignup({
@@ -642,19 +667,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         message: data.message || `A 6-digit verification code has been dispatched to ${cleanEmail}. Please check your inbox (and Spam/Junk folder).`,
       };
     } catch (err: any) {
-      setPendingSignup({
-        full_name: cleanName,
-        email: cleanEmail,
-        phone: cleanPhone,
-        password_hash: password || 'Citizen@2026',
-        citizen_uid: generatedUid,
-        channel: '6-Digit Email OTP',
-        isEmailLiveSent: false,
-      });
-
       return {
-        success: true,
-        message: `A 6-digit verification code has been dispatched to ${cleanEmail}. Please check your email inbox (and Spam/Junk folder).`,
+        success: false,
+        message: err?.message || 'Error initiating verification dispatch.',
       };
     }
   };

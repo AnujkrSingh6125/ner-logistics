@@ -5,7 +5,7 @@ import { sendEmailVerificationOTP, storeOTPRecord, generateOTP } from '@/lib/bre
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, fullName, full_name, phone, role, selectedRole, password, passwordHash } = body;
+    const { email, fullName, full_name, phone, role, selectedRole, password, passwordHash, isRegistration } = body;
 
     const normalizedEmail = (email || '').trim().toLowerCase();
     const name = (fullName || full_name || 'Citizen User').trim();
@@ -17,6 +17,45 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Email address is required to dispatch verification OTP.' },
         { status: 400 }
       );
+    }
+
+    // 0. Strict Uniqueness Check: Only a single user can create an account with an email ID
+    if (isRegistration && supabase) {
+      try {
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('email', normalizedEmail)
+          .maybeSingle();
+
+        if (existingProfile) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'An account with this email address already exists. Only a single user can create an account per email ID. Please sign in instead.',
+            },
+            { status: 400 }
+          );
+        }
+
+        const { data: existingClient } = await supabase
+          .from('client_users')
+          .select('email')
+          .eq('email', normalizedEmail)
+          .maybeSingle();
+
+        if (existingClient) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'An account with this email address already exists. Only a single user can create an account per email ID. Please sign in instead.',
+            },
+            { status: 400 }
+          );
+        }
+      } catch (checkErr) {
+        console.warn('Email uniqueness check note:', checkErr);
+      }
     }
 
     let supabaseDispatched = false;

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabaseClient';
 import { sendEmailVerificationOTP } from '@/lib/brevo';
 
 export async function POST(request: NextRequest) {
@@ -24,9 +25,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Check if account already exists with this email address
+    if (supabase) {
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('email', cleanEmail)
+        .maybeSingle();
+
+      if (existingProfile) {
+        return NextResponse.json(
+          {
+            error:
+              'An account with this email address already exists. Only a single user can create an account with an email ID. Please sign in instead.',
+          },
+          { status: 400 }
+        );
+      }
+
+      const { data: existingClient } = await supabase
+        .from('client_users')
+        .select('email')
+        .eq('email', cleanEmail)
+        .maybeSingle();
+
+      if (existingClient) {
+        return NextResponse.json(
+          {
+            error:
+              'An account with this email address already exists. Only a single user can create an account with an email ID. Please sign in instead.',
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     // Dispatch Email OTP via Brevo REST API
     const result = await sendEmailVerificationOTP(
-      email.trim().toLowerCase(),
+      cleanEmail,
       full_name.trim(),
       phone.trim(),
       password

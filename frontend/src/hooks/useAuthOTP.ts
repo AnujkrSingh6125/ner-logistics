@@ -36,6 +36,25 @@ export function useAuthOTP(): UseAuthOTPResult {
     }
 
     try {
+      // 0. Pre-check: Enforce only a single user account per email ID
+      if (metadata.isRegistration && supabase) {
+        try {
+          const { data: existingProfile } = await supabase
+            .from('profiles')
+            .select('email')
+            .eq('email', cleanEmail)
+            .maybeSingle();
+
+          if (existingProfile) {
+            const msg =
+              'An account with this email address already exists. Only a single user can create an account per email ID. Please sign in instead.';
+            setErrorMsg(msg);
+            setLoading(false);
+            return false;
+          }
+        } catch (e) {}
+      }
+
       let supaSuccess = false;
 
       // 1. Primary: Supabase Native Passwordless OTP with emailRedirectTo: undefined
@@ -58,11 +77,16 @@ export function useAuthOTP(): UseAuthOTPResult {
             fullName: metadata.full_name || metadata.fullName,
             phone: metadata.phone,
             role: metadata.role || 'CITIZEN_DRIVER',
+            isRegistration: metadata.isRegistration,
           }),
         });
         const apiData = await res.json();
         if (res.ok && apiData.success) {
           supaSuccess = true;
+        } else if (apiData.error) {
+          setErrorMsg(apiData.error);
+          setLoading(false);
+          return false;
         }
       } catch (apiErr: any) {
         console.warn('[useAuthOTP] API route notice:', apiErr.message);
