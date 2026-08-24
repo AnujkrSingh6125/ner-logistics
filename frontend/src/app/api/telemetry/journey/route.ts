@@ -2,39 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 import { LiveJourney } from '@/types';
 
-// Baseline Live Simulated Driver Convoys in NER
-const BASELINE_JOURNEYS: LiveJourney[] = [
-  {
-    id: 'journey-01',
-    citizen_uid: 'NER-CIT-49210',
-    driver_name: 'Debojit Kalita (Oxygen Tanker Convoy)',
-    origin_hub: 'Guwahati Multi-Modal Transshipment Hub',
-    destination_hub: 'Imphal Eastern Logistics Depot',
-    current_lat: 25.6751,
-    current_lng: 92.8933,
-    heading: 115,
-    speed_kmh: 42,
-    is_active: true,
-    shared_with: 'ALL',
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'journey-02',
-    citizen_uid: 'NER-CIT-88412',
-    driver_name: 'Tashi Namgyal (Vaccine Cold-Chain Truck)',
-    origin_hub: 'Dimapur Railhead Strategic Hub',
-    destination_hub: 'Kohima Hill Logistics Center',
-    current_lat: 25.8210,
-    current_lng: 93.8500,
-    heading: 85,
-    speed_kmh: 34,
-    is_active: true,
-    shared_with: 'ALL',
-    updated_at: new Date().toISOString(),
-  },
-];
+// Baseline Live Simulated Driver Convoys in NER (defaults to live database records)
+const BASELINE_JOURNEYS: LiveJourney[] = [];
 
-let memoryJourneys: LiveJourney[] = [...BASELINE_JOURNEYS];
+let memoryJourneys: LiveJourney[] = [];
 
 export async function GET() {
   try {
@@ -46,15 +17,15 @@ export async function GET() {
           .eq('is_active', true)
           .order('updated_at', { ascending: false });
 
-        if (!error && data && data.length > 0) {
-          return NextResponse.json(data);
+        if (!error && data) {
+          return NextResponse.json({ success: true, data });
         }
       } catch (err) {
         console.warn('Supabase live_journeys query notice:', err);
       }
     }
 
-    return NextResponse.json(memoryJourneys);
+    return NextResponse.json({ success: true, data: memoryJourneys });
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Error fetching live journeys' }, { status: 500 });
   }

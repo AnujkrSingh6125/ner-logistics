@@ -156,103 +156,9 @@ let simulatedDisruptionsMemory: RoadDisruption[] = [];
 export const FALLBACK_SUPPLY_HUBS = BASELINE_SUPPLY_HUBS;
 export const FALLBACK_DISRUPTIONS: RoadDisruption[] = [];
 
-export const FALLBACK_SHIPMENTS: Shipment[] = [
-  {
-    id: 'shp-convoy-01',
-    tracking_code: 'NER-CVY-8841',
-    driver_id: 'NER-CIT-10492',
-    driver_name: 'Rajesh Borah',
-    cargo_type: 'MEDICINE',
-    cargo_tier: 'TIER_1_CRITICAL',
-    cargo_manifest: 'Emergency Pediatric Vaccines & Antivenom Serum',
-    priority_level: 5,
-    origin_name: 'Guwahati Central Strategic Warehouse',
-    destination_name: 'Shillong Highland Transit Terminal',
-    origin: {
-      name: 'Guwahati Central Strategic Warehouse',
-      latitude: 26.1445,
-      longitude: 91.7362,
-    },
-    destination: {
-      name: 'Shillong Highland Transit Terminal',
-      latitude: 25.5788,
-      longitude: 91.8933,
-    },
-    current_status: 'IN_TRANSIT',
-    current_lat: 25.9124,
-    current_lng: 91.8214,
-    heading: 145,
-    speed: 48,
-    speed_kmh: 48,
-    weight_tonnes: 4.2,
-    created_at: new Date(Date.now() - 3600000).toISOString(),
-    last_ping_at: new Date().toISOString(),
-  },
-  {
-    id: 'shp-convoy-02',
-    tracking_code: 'NER-CVY-9923',
-    driver_id: 'NER-CIT-44821',
-    driver_name: 'Tsering Dorjee',
-    cargo_type: 'PERISHABLE_FOOD',
-    cargo_tier: 'TIER_2_ESSENTIAL',
-    cargo_manifest: 'High-Altitude Ration Packs & Potable Water',
-    priority_level: 4,
-    origin_name: 'Dimapur Transshipment Depot',
-    destination_name: 'Kohima Buffer Depot',
-    origin: {
-      name: 'Dimapur Transshipment Depot',
-      latitude: 25.9064,
-      longitude: 93.7279,
-    },
-    destination: {
-      name: 'Kohima Buffer Depot',
-      latitude: 25.6751,
-      longitude: 94.1086,
-    },
-    current_status: 'IN_TRANSIT',
-    current_lat: 25.7821,
-    current_lng: 93.9142,
-    heading: 98,
-    speed: 42,
-    speed_kmh: 42,
-    weight_tonnes: 8.5,
-    created_at: new Date(Date.now() - 7200000).toISOString(),
-    last_ping_at: new Date().toISOString(),
-  },
-  {
-    id: 'shp-convoy-03',
-    tracking_code: 'NER-CVY-3310',
-    driver_id: 'NER-CIT-77192',
-    driver_name: 'Vikram Sangma',
-    cargo_type: 'FUEL',
-    cargo_tier: 'TIER_3_BULK',
-    cargo_manifest: 'Aviation & Diesel Fuel Reserves for Backup Generators',
-    priority_level: 3,
-    origin_name: 'Silchar Barak Valley Hub',
-    destination_name: 'Aizawl Southern Relief Hub',
-    origin: {
-      name: 'Silchar Barak Valley Hub',
-      latitude: 24.8333,
-      longitude: 92.7789,
-    },
-    destination: {
-      name: 'Aizawl Southern Relief Hub',
-      latitude: 23.7271,
-      longitude: 92.7176,
-    },
-    current_status: 'REROUTED',
-    current_lat: 24.3129,
-    current_lng: 92.7418,
-    heading: 190,
-    speed: 36,
-    speed_kmh: 36,
-    weight_tonnes: 12.0,
-    created_at: new Date(Date.now() - 10800000).toISOString(),
-    last_ping_at: new Date().toISOString(),
-  },
-];
+export const FALLBACK_SHIPMENTS: Shipment[] = [];
 
-let activeShipmentsMemory: Shipment[] = [...FALLBACK_SHIPMENTS];
+let activeShipmentsMemory: Shipment[] = [];
 
 // Fetch Supply Hubs (Supabase with Fallback)
 export async function fetchSupplyHubs(): Promise<SupplyHub[]> {
@@ -396,30 +302,29 @@ export async function resetSimulatedDisruptions(): Promise<RoadDisruption[]> {
   return BASELINE_DISRUPTIONS;
 }
 
-// Fetch Shipments (Combines Supabase with local memory reactive fleet)
+// Fetch Shipments strictly from database (or local memory if offline)
 export async function fetchShipments(): Promise<Shipment[]> {
-  let dbList: Shipment[] = [];
   if (supabase) {
     try {
       const { data, error } = await supabase
         .from('shipments')
         .select('*')
         .order('created_at', { ascending: false });
-      if (!error && data && data.length > 0) {
-        dbList = data.map((item: any) => ({
+      if (!error && data) {
+        const dbList = data.map((item: any) => ({
           ...item,
           origin_name: item.origin_name || (typeof item.origin === 'object' ? item.origin?.name : item.origin) || 'Origin Hub',
           destination_name: item.destination_name || (typeof item.destination === 'object' ? item.destination?.name : item.destination) || 'Destination Hub',
         })) as Shipment[];
+        activeShipmentsMemory = dbList;
+        return dbList;
       }
     } catch (err) {
-      console.warn('Supabase fetch error, using regional defaults:', err);
+      console.warn('Supabase fetch error, using local memory:', err);
     }
   }
 
-  const merged = [...activeShipmentsMemory, ...dbList];
-  const unique = Array.from(new Map(merged.map((s) => [s.id, s])).values());
-  return unique;
+  return activeShipmentsMemory;
 }
 
 // Insert Shipment strictly for Authorized Supply Hub Accounts

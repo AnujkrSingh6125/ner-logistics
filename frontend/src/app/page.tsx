@@ -62,7 +62,7 @@ export default function DashboardPage() {
   // Pre-seed state with baseline data for instant hydration & 100% offline resilience
   const [hubs, setHubs] = useState<SupplyHub[]>(BASELINE_SUPPLY_HUBS);
   const [disruptions, setDisruptions] = useState<RoadDisruption[]>(BASELINE_DISRUPTIONS);
-  const [shipments, setShipments] = useState<Shipment[]>(FALLBACK_SHIPMENTS);
+  const [shipments, setShipments] = useState<Shipment[]>([]);
   const [trackedShipment, setTrackedShipment] = useState<Shipment | null>(null);
 
   // Selection and routing states
@@ -115,7 +115,7 @@ export default function DashboardPage() {
       ]);
       if (hubsData && hubsData.length > 0) setHubs(hubsData);
       if (disruptionsData && disruptionsData.length > 0) setDisruptions(disruptionsData);
-      if (shipmentsData && shipmentsData.length > 0) setShipments(shipmentsData);
+      if (shipmentsData) setShipments(shipmentsData);
     } catch (err) {
       console.warn('Supabase fetch error, fallback active:', err);
     } finally {
