@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { SupplyHub, RoadDisruption, Shipment, SimulatedHazardInput, RegisterShipmentInput, SystemBroadcast, Profile } from '@/types';
+import { SupplyHub, RoadDisruption, Shipment, SimulatedHazardInput, RegisterShipmentInput, SystemBroadcast, Profile, LiveJourney } from '@/types';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -1261,6 +1261,12 @@ export type RealtimeSyncEvent =
   | { type: 'hazard_insert'; payload: RoadDisruption }
   | { type: 'hazard_update'; payload: RoadDisruption }
   | { type: 'hazard_delete'; payload: string }
+  | { type: 'hub_insert'; payload: SupplyHub }
+  | { type: 'hub_update'; payload: SupplyHub }
+  | { type: 'hub_delete'; payload: string }
+  | { type: 'journey_insert'; payload: LiveJourney }
+  | { type: 'journey_update'; payload: LiveJourney }
+  | { type: 'journey_delete'; payload: string }
   | { type: 'broadcast_insert'; payload: SystemBroadcast }
   | { type: 'broadcast_update'; payload: SystemBroadcast }
   | { type: 'broadcast_delete'; payload: string };
@@ -1669,6 +1675,130 @@ export function subscribeToAllBroadcastsRealtime(
       });
     } catch (err) {
       console.warn('Realtime system broadcasts subscription error:', err);
+    }
+  }
+
+  return () => {
+    cleanupFns.forEach((fn) => fn());
+  };
+}
+
+// Supabase Realtime WebSocket subscription for supply hubs
+export function subscribeToAllSupplyHubsRealtime(
+  onInsert: (hub: SupplyHub) => void,
+  onUpdate: (hub: SupplyHub) => void,
+  onDelete: (nameOrId: string) => void
+) {
+  const cleanupFns: Array<() => void> = [];
+
+  // 1. Cross-Tab BroadcastChannel
+  if (crossTabChannel) {
+    const handleBroadcastMsg = (ev: MessageEvent) => {
+      const data = ev.data as RealtimeSyncEvent;
+      if (!data) return;
+      if (data.type === 'hub_insert') {
+        onInsert(data.payload);
+      } else if (data.type === 'hub_update') {
+        onUpdate(data.payload);
+      } else if (data.type === 'hub_delete') {
+        onDelete(data.payload);
+      }
+    };
+    crossTabChannel.addEventListener('message', handleBroadcastMsg);
+    cleanupFns.push(() => crossTabChannel?.removeEventListener('message', handleBroadcastMsg));
+  }
+
+  // 2. Supabase Realtime postgres_changes
+  if (supabase) {
+    try {
+      console.log('[SUPABASE REALTIME] Subscribing to public:supply_hubs channel...');
+      const channel = supabase
+        .channel('realtime-supply-hubs-channel')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'supply_hubs' },
+          (payload: any) => {
+            console.log('[SUPABASE REALTIME SUPPLY_HUBS EVENT]:', payload.eventType, payload);
+            if (payload.eventType === 'INSERT' && payload.new) {
+              onInsert(payload.new as SupplyHub);
+            } else if (payload.eventType === 'UPDATE' && payload.new) {
+              onUpdate(payload.new as SupplyHub);
+            } else if (payload.eventType === 'DELETE' && payload.old) {
+              onDelete(payload.old.name || payload.old.id);
+            }
+          }
+        )
+        .subscribe((status) => {
+          console.log('[SUPABASE REALTIME SUPPLY_HUBS CHANNEL STATUS]:', status);
+        });
+
+      cleanupFns.push(() => {
+        supabase.removeChannel(channel);
+      });
+    } catch (err) {
+      console.warn('Realtime supply hubs subscription error:', err);
+    }
+  }
+
+  return () => {
+    cleanupFns.forEach((fn) => fn());
+  };
+}
+
+// Supabase Realtime WebSocket subscription for live journeys
+export function subscribeToLiveJourneysRealtime(
+  onInsert: (journey: LiveJourney) => void,
+  onUpdate: (journey: LiveJourney) => void,
+  onDelete: (id: string) => void
+) {
+  const cleanupFns: Array<() => void> = [];
+
+  // 1. Cross-Tab BroadcastChannel
+  if (crossTabChannel) {
+    const handleBroadcastMsg = (ev: MessageEvent) => {
+      const data = ev.data as RealtimeSyncEvent;
+      if (!data) return;
+      if (data.type === 'journey_insert') {
+        onInsert(data.payload);
+      } else if (data.type === 'journey_update') {
+        onUpdate(data.payload);
+      } else if (data.type === 'journey_delete') {
+        onDelete(data.payload);
+      }
+    };
+    crossTabChannel.addEventListener('message', handleBroadcastMsg);
+    cleanupFns.push(() => crossTabChannel?.removeEventListener('message', handleBroadcastMsg));
+  }
+
+  // 2. Supabase Realtime postgres_changes
+  if (supabase) {
+    try {
+      console.log('[SUPABASE REALTIME] Subscribing to public:live_journeys channel...');
+      const channel = supabase
+        .channel('realtime-live-journeys-channel')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'live_journeys' },
+          (payload: any) => {
+            console.log('[SUPABASE REALTIME LIVE_JOURNEYS EVENT]:', payload.eventType, payload);
+            if (payload.eventType === 'INSERT' && payload.new) {
+              onInsert(payload.new as LiveJourney);
+            } else if (payload.eventType === 'UPDATE' && payload.new) {
+              onUpdate(payload.new as LiveJourney);
+            } else if (payload.eventType === 'DELETE' && payload.old) {
+              onDelete(payload.old.id);
+            }
+          }
+        )
+        .subscribe((status) => {
+          console.log('[SUPABASE REALTIME LIVE_JOURNEYS CHANNEL STATUS]:', status);
+        });
+
+      cleanupFns.push(() => {
+        supabase.removeChannel(channel);
+      });
+    } catch (err) {
+      console.warn('Realtime live journeys subscription error:', err);
     }
   }
 

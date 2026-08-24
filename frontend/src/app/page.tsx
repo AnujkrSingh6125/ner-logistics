@@ -22,6 +22,7 @@ import {
   updateShipmentTelemetry,
   subscribeToAllShipmentsRealtime,
   subscribeToAllHazardsRealtime,
+  subscribeToAllSupplyHubsRealtime,
   BASELINE_SUPPLY_HUBS,
   BASELINE_DISRUPTIONS,
   FALLBACK_SHIPMENTS,
@@ -221,6 +222,25 @@ export default function DashboardPage() {
         console.log('[REALTIME BROADCAST RECEIVED] Convoy shipment deleted:', deletedId);
         setShipments((prev) => prev.filter((s) => s.id !== deletedId));
         setTrackedShipment((current) => (current?.id === deletedId ? null : current));
+      }
+    );
+
+    return () => {
+      unsub();
+    };
+  }, []);
+
+  // Realtime Supabase Subscription on public.supply_hubs table
+  useEffect(() => {
+    const unsub = subscribeToAllSupplyHubsRealtime(
+      (incomingHub) => {
+        setHubs((prev) => [incomingHub, ...prev.filter((h) => h.name !== incomingHub.name && h.id !== incomingHub.id)]);
+      },
+      (updatedHub) => {
+        setHubs((prev) => prev.map((h) => (h.name === updatedHub.name || h.id === updatedHub.id ? updatedHub : h)));
+      },
+      (deletedNameOrId) => {
+        setHubs((prev) => prev.filter((h) => h.name !== deletedNameOrId && h.id !== deletedNameOrId));
       }
     );
 

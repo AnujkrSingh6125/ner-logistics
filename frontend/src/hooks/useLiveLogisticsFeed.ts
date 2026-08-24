@@ -8,6 +8,7 @@ import {
   fetchShipments,
   subscribeToAllShipmentsRealtime,
   subscribeToAllHazardsRealtime,
+  subscribeToAllSupplyHubsRealtime,
   subscribeToAllBroadcastsRealtime,
   BASELINE_SUPPLY_HUBS,
   BASELINE_DISRUPTIONS,
@@ -149,6 +150,25 @@ export function useLiveLogisticsFeed(): UseLiveLogisticsFeedResult {
 
     return () => {
       unsubBroadcasts();
+    };
+  }, []);
+
+  // Persistent Realtime Supply Hubs Subscription
+  useEffect(() => {
+    const unsubHubs = subscribeToAllSupplyHubsRealtime(
+      (incomingHub) => {
+        setHubs((prev) => [incomingHub, ...prev.filter((h) => h.name !== incomingHub.name && h.id !== incomingHub.id)]);
+      },
+      (updatedHub) => {
+        setHubs((prev) => prev.map((h) => (h.name === updatedHub.name || h.id === updatedHub.id ? updatedHub : h)));
+      },
+      (deletedNameOrId) => {
+        setHubs((prev) => prev.filter((h) => h.name !== deletedNameOrId && h.id !== deletedNameOrId));
+      }
+    );
+
+    return () => {
+      unsubHubs();
     };
   }, []);
 
