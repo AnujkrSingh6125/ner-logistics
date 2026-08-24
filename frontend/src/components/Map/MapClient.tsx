@@ -45,17 +45,26 @@ import {
 } from 'lucide-react';
 import LiveNavigationHUD, { ThreatAlertData } from '@/components/Navigation/LiveNavigationHUD';
 
-// Helper component to trigger Leaflet tile re-render on resize / full-screen toggle
+// Helper component to trigger Leaflet tile re-render on resize / orientation / full-screen toggle
 function MapResizer({ isFullscreen }: { isFullscreen: boolean }) {
   const map = useMap();
 
   useEffect(() => {
+    const handleResize = () => {
+      map.invalidateSize();
+    };
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+
     map.invalidateSize();
     const t1 = setTimeout(() => map.invalidateSize(), 100);
     const t2 = setTimeout(() => map.invalidateSize(), 300);
     const t3 = setTimeout(() => map.invalidateSize(), 600);
 
     return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
@@ -65,7 +74,7 @@ function MapResizer({ isFullscreen }: { isFullscreen: boolean }) {
   return null;
 }
 
-// Unified Vertical Floating Glass Toolbar on Left Edge
+// Unified Vertical Floating Glass Toolbar with Driver Touch Ergonomics (Min 44px)
 function UnifiedMapToolbar({
   isFullscreen,
   onToggleFullscreen,
@@ -83,7 +92,7 @@ function UnifiedMapToolbar({
 
   return (
     <div
-      className="absolute top-4 left-4 z-[9999] flex flex-col rounded-2xl overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.5)] border border-slate-700/60 bg-[#070f1e]/85 backdrop-blur-xl transition-all duration-200 pointer-events-auto select-none divide-y divide-slate-800/80"
+      className="absolute top-3 left-3 sm:top-4 sm:left-4 z-[999] flex flex-col rounded-2xl overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.6)] border border-slate-700/70 bg-[#070f1e]/90 backdrop-blur-xl transition-all duration-200 pointer-events-auto select-none divide-y divide-slate-800/80"
       onClick={(e) => e.stopPropagation()}
     >
       {/* Zoom In */}
@@ -94,11 +103,11 @@ function UnifiedMapToolbar({
           e.stopPropagation();
           map.zoomIn();
         }}
-        className="w-9 h-9 flex items-center justify-center text-slate-300 hover:text-white hover:bg-cyan-500/20 active:bg-cyan-500/40 transition"
+        className="w-11 h-11 sm:w-10 sm:h-10 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-300 hover:text-white hover:bg-cyan-500/20 active:bg-cyan-500/40 transition"
         title="Zoom In (+)"
         aria-label="Zoom In"
       >
-        <Plus className="w-4 h-4" />
+        <Plus className="w-4 h-4 sm:w-4 sm:h-4 stroke-[2.5]" />
       </button>
 
       {/* Zoom Out */}
@@ -109,11 +118,11 @@ function UnifiedMapToolbar({
           e.stopPropagation();
           map.zoomOut();
         }}
-        className="w-9 h-9 flex items-center justify-center text-slate-300 hover:text-white hover:bg-cyan-500/20 active:bg-cyan-500/40 transition"
+        className="w-11 h-11 sm:w-10 sm:h-10 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-300 hover:text-white hover:bg-cyan-500/20 active:bg-cyan-500/40 transition"
         title="Zoom Out (−)"
         aria-label="Zoom Out"
       >
-        <Minus className="w-4 h-4" />
+        <Minus className="w-4 h-4 sm:w-4 sm:h-4 stroke-[2.5]" />
       </button>
 
       {/* Recenter on GPS */}
@@ -126,11 +135,11 @@ function UnifiedMapToolbar({
             map.setView(userLocation, 14, { animate: true });
             onRecenterGps?.();
           }}
-          className="w-9 h-9 flex items-center justify-center text-cyan-400 hover:text-cyan-200 hover:bg-cyan-500/20 active:bg-cyan-500/40 transition"
+          className="w-11 h-11 sm:w-10 sm:h-10 min-h-[44px] min-w-[44px] flex items-center justify-center text-cyan-400 hover:text-cyan-200 hover:bg-cyan-500/20 active:bg-cyan-500/40 transition"
           title="Recenter on My Live GPS Vehicle"
           aria-label="Recenter GPS"
         >
-          <LocateFixed className="w-4 h-4" />
+          <LocateFixed className="w-4 h-4 sm:w-4 sm:h-4" />
         </button>
       )}
 
@@ -142,11 +151,11 @@ function UnifiedMapToolbar({
           e.stopPropagation();
           map.setView([26.1445, 92.5], 7, { animate: true });
         }}
-        className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-white hover:bg-cyan-500/20 active:bg-cyan-500/40 transition"
+        className="w-11 h-11 sm:w-10 sm:h-10 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-white hover:bg-cyan-500/20 active:bg-cyan-500/40 transition"
         title="Reset Northeast Regional Corridor View"
         aria-label="Reset Region View"
       >
-        <RotateCcw className="w-3.5 h-3.5" />
+        <RotateCcw className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
       </button>
 
       {/* Fullscreen Toggle */}
@@ -157,7 +166,7 @@ function UnifiedMapToolbar({
           e.stopPropagation();
           onToggleFullscreen();
         }}
-        className="w-9 h-9 flex items-center justify-center text-slate-300 hover:text-cyan-400 hover:bg-cyan-500/20 active:bg-cyan-500/40 transition"
+        className="w-11 h-11 sm:w-10 sm:h-10 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-300 hover:text-cyan-400 hover:bg-cyan-500/20 active:bg-cyan-500/40 transition"
         title={isFullscreen ? 'Exit Full Screen (ESC)' : 'Expand Map Full Screen'}
         aria-label="Toggle Full Screen"
       >

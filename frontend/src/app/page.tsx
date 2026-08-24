@@ -47,11 +47,17 @@ import {
   Sparkles,
   Building2,
   Navigation,
+  Compass,
+  Truck,
+  MapPin,
 } from 'lucide-react';
 
 export default function DashboardPage() {
   const { user, isGovOfficial, openAuthModal } = useAuth();
   const gps = useGps();
+
+  // Mobile viewport tab state ('map' | 'planner' | 'alerts' | 'fleet')
+  const [mobileTab, setMobileTab] = useState<'map' | 'planner' | 'alerts' | 'fleet'>('map');
 
   // Pre-seed state with baseline data for instant hydration & 100% offline resilience
   const [hubs, setHubs] = useState<SupplyHub[]>(BASELINE_SUPPLY_HUBS);
@@ -662,7 +668,7 @@ export default function DashboardPage() {
         <BroadcastBanner />
       </div>
 
-      <main className="flex-1 max-w-7xl w-full mx-auto p-3 md:p-4 flex flex-col space-y-3 min-h-0 lg:overflow-hidden">
+      <main className="flex-1 max-w-7xl w-full mx-auto p-2.5 sm:p-3 md:p-4 flex flex-col space-y-2.5 sm:space-y-3 min-h-0 lg:overflow-hidden">
         {/* Top Key Metrics Row */}
         <div className="shrink-0">
           <StatsOverview
@@ -672,34 +678,105 @@ export default function DashboardPage() {
           />
         </div>
 
+        {/* Mobile Single-Thumb Navigation Tab Switcher (Visible on < lg, Hidden on Desktop) */}
+        <div className="lg:hidden shrink-0 grid grid-cols-4 gap-1 p-1 bg-white/95 dark:bg-[#070e1c]/90 border border-slate-200 dark:border-slate-800/80 rounded-2xl shadow-sm backdrop-blur-xl">
+          <button
+            type="button"
+            onClick={() => setMobileTab('map')}
+            className={`min-h-[44px] flex flex-col items-center justify-center gap-0.5 rounded-xl text-[11px] font-black transition ${
+              mobileTab === 'map'
+                ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/30'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Compass className="w-4 h-4" />
+            <span>Map</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab('planner')}
+            className={`min-h-[44px] flex flex-col items-center justify-center gap-0.5 rounded-xl text-[11px] font-black transition ${
+              mobileTab === 'planner'
+                ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/30'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Navigation className="w-4 h-4" />
+            <span>Planner</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab('alerts')}
+            className={`min-h-[44px] flex flex-col items-center justify-center gap-0.5 rounded-xl text-[11px] font-black transition ${
+              mobileTab === 'alerts'
+                ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/30'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <div className="relative flex items-center justify-center">
+              <ShieldAlert className="w-4 h-4" />
+              {disruptions.length > 0 && (
+                <span className="absolute -top-1 -right-2.5 w-3.5 h-3.5 bg-rose-500 text-[9px] text-white rounded-full flex items-center justify-center font-mono font-bold">
+                  {disruptions.length}
+                </span>
+              )}
+            </div>
+            <span>Hazards</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab('fleet')}
+            className={`min-h-[44px] flex flex-col items-center justify-center gap-0.5 rounded-xl text-[11px] font-black transition ${
+              mobileTab === 'fleet'
+                ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/30'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <div className="relative flex items-center justify-center">
+              <Truck className="w-4 h-4" />
+              {shipments.length > 0 && (
+                <span className="absolute -top-1 -right-2.5 w-3.5 h-3.5 bg-emerald-500 text-[9px] text-white rounded-full flex items-center justify-center font-mono font-bold">
+                  {shipments.length}
+                </span>
+              )}
+            </div>
+            <span>Fleet</span>
+          </button>
+        </div>
+
         {/* Tactical 2-Column Responsive Layout */}
         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3 pb-1">
-          {/* Left Column: Tactical Geospatial Map (8 cols) */}
-          <div className="lg:col-span-8 flex flex-col h-full min-h-0 space-y-2">
+          {/* Left Column: Tactical Geospatial Map (8 cols on lg, conditionally rendered on mobile) */}
+          <div
+            className={`lg:col-span-8 flex-col h-full min-h-0 space-y-2 ${
+              mobileTab === 'map' ? 'flex' : 'hidden lg:flex'
+            }`}
+          >
             {/* Map Layer Toolbar */}
-            <div className="flex items-center justify-between px-3.5 py-1.5 rounded-2xl bg-white/90 dark:bg-[#070e1c]/85 border border-slate-200 dark:border-slate-800/80 shadow-sm dark:shadow-md backdrop-blur-xl transition-colors duration-200">
-              <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                  GIS Layer Controls
+            <div className="flex items-center justify-between px-3 sm:px-3.5 py-1.5 rounded-2xl bg-white/90 dark:bg-[#070e1c]/85 border border-slate-200 dark:border-slate-800/80 shadow-sm dark:shadow-md backdrop-blur-xl transition-colors duration-200">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-600 dark:text-cyan-400" />
+                <span className="text-[11px] sm:text-xs font-bold text-slate-800 dark:text-slate-200">
+                  GIS Layers
                 </span>
                 {isSimulatingHazard && isGovOfficial && (
-                  <span className="text-[10px] bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-800/80 px-2 py-0.5 rounded-full font-mono flex items-center gap-1 font-semibold">
+                  <span className="text-[9px] sm:text-[10px] bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-800/80 px-1.5 sm:px-2 py-0.5 rounded-full font-mono flex items-center gap-1 font-semibold">
                     <Sparkles className="w-2.5 h-2.5 text-amber-500 dark:text-amber-400" />
-                    Hazard Simulation Active
+                    Hazard Active
                   </span>
                 )}
                 {gps.isNavigating && (
-                  <span className="text-[10px] bg-emerald-100 text-emerald-900 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800/80 px-2 py-0.5 rounded-full font-mono flex items-center gap-1 font-bold animate-pulse">
+                  <span className="text-[9px] sm:text-[10px] bg-emerald-100 text-emerald-900 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800/80 px-1.5 sm:px-2 py-0.5 rounded-full font-mono flex items-center gap-1 font-bold animate-pulse">
                     <Navigation className="w-2.5 h-2.5" />
-                    GPS Navigation Active
+                    Navigating
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 sm:gap-2">
                 <button
+                  type="button"
                   onClick={() => setShowHubs(!showHubs)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition text-[11px] font-medium border ${
+                  className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-xl transition text-[10px] sm:text-[11px] font-medium border ${
                     showHubs
                       ? 'bg-cyan-100 text-cyan-900 border-cyan-300 dark:bg-cyan-950/80 dark:text-cyan-300 dark:border-cyan-700/60 shadow-sm'
                       : 'bg-slate-100 dark:bg-slate-900/80 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:text-slate-900 dark:hover:text-slate-200'
@@ -713,8 +790,9 @@ export default function DashboardPage() {
                   <span>Hubs</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => setShowDisruptions(!showDisruptions)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition text-[11px] font-medium border ${
+                  className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-xl transition text-[10px] sm:text-[11px] font-medium border ${
                     showDisruptions
                       ? 'bg-red-100 text-red-900 border-red-300 dark:bg-red-950/80 dark:text-red-300 dark:border-red-700/60 shadow-sm'
                       : 'bg-slate-100 dark:bg-slate-900/80 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:text-slate-900 dark:hover:text-slate-200'
@@ -728,21 +806,22 @@ export default function DashboardPage() {
                   <span>Hazards</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => setShowBuffers(!showBuffers)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition text-[11px] font-medium border ${
+                  className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-xl transition text-[10px] sm:text-[11px] font-medium border ${
                     showBuffers
                       ? 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/80 dark:text-amber-300 dark:border-amber-700/60 shadow-sm'
                       : 'bg-slate-100 dark:bg-slate-900/80 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
                 >
                   <CircleDot className="w-3 h-3 text-amber-600 dark:text-amber-400" />
-                  <span>Buffer Zones</span>
+                  <span className="hidden xs:inline">Buffers</span>
                 </button>
               </div>
             </div>
 
-            {/* Map Display Container */}
-            <div className="flex-1 w-full min-h-0 h-full rounded-2xl overflow-hidden shadow-sm dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)] border border-slate-200 dark:border-slate-800/80 relative">
+            {/* Map Display Canvas Container */}
+            <div className="flex-1 w-full min-h-[55vh] sm:min-h-[480px] lg:min-h-0 h-full rounded-2xl overflow-hidden shadow-sm dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)] border border-slate-200 dark:border-slate-800/80 relative">
               <LogisticsMap
                 hubs={hubs}
                 disruptions={disruptions}
@@ -779,13 +858,44 @@ export default function DashboardPage() {
                 onDismissThreatAlert={() => setThreatAlert(null)}
                 onToggleSimulation={handleToggleSimulation}
               />
+
+              {/* Mobile Single-Thumb Bottom Action Pill */}
+              <div className="lg:hidden absolute bottom-3 inset-x-3 z-[990] flex items-center justify-between gap-2 pointer-events-auto">
+                {routeData && (
+                  <button
+                    type="button"
+                    onClick={gps.isNavigating ? gps.stopNavigation : handleStartNavigation}
+                    className={`flex-1 min-h-[44px] py-2.5 px-4 rounded-2xl font-black text-xs shadow-2xl flex items-center justify-center gap-2 border transition ${
+                      gps.isNavigating
+                        ? 'bg-rose-600 hover:bg-rose-500 border-rose-400 text-white animate-pulse'
+                        : 'bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 border-emerald-400/40 text-white'
+                    }`}
+                  >
+                    <Navigation className="w-4 h-4 stroke-[2.5]" />
+                    <span>{gps.isNavigating ? 'Exit Navigation' : 'Start Driver Navigation'}</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setMobileTab('planner')}
+                  className="min-h-[44px] px-3.5 py-2.5 rounded-2xl bg-slate-950/90 hover:bg-slate-900 border border-slate-700/80 text-cyan-300 font-bold text-xs shadow-2xl backdrop-blur-xl flex items-center gap-1.5"
+                >
+                  <MapPin className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Route Info</span>
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Right Column: Route Planner, Multi-Hub Recommender & Live Feeds (4 cols) - Independently Scrollable */}
-          <div className="lg:col-span-4 h-full min-h-0 overflow-y-auto pr-1 md:pr-1.5 space-y-3 custom-scrollbar">
+          {/* Right Column: Route Planner, Multi-Hub Recommender & Live Feeds (4 cols on lg, conditionally rendered on mobile) */}
+          <div
+            className={`lg:col-span-4 h-full min-h-0 overflow-y-auto pr-0 lg:pr-1.5 space-y-3 custom-scrollbar ${
+              mobileTab !== 'map' ? 'block' : 'hidden lg:block'
+            }`}
+          >
             {/* Alternate Hub Sourcing Drawer (when opened) */}
-            {showAlternateHubs && (
+            {(mobileTab === 'planner' || mobileTab === 'map') && showAlternateHubs && (
               <AlternateHubRecommender
                 recommendations={hubRecommendations}
                 destination={destHub}
@@ -794,60 +904,75 @@ export default function DashboardPage() {
               />
             )}
 
-            <RoutePlanner
-              hubs={hubs}
-              originHub={originHub}
-              destHub={destHub}
-              routeData={routeData}
-              activeRouteView={activeRouteView}
-              cargoTier={cargoTier}
-              selectedRouteIndex={selectedRouteIndex}
-              isGpsEnabled={gps.isGpsEnabled}
-              userLocation={gps.userCoordinates}
-              isTracking={gps.isGpsEnabled}
-              isNavigating={gps.isNavigating}
-              onSetOrigin={setOriginHub}
-              onSetDestination={setDestHub}
-              onSetCargoTier={setCargoTier}
-              onRouteCalculated={(data) => {
-                setRouteData(data);
-                if (data?.selectedRouteIndex !== undefined) {
-                  setSelectedRouteIndex(data.selectedRouteIndex);
+            {/* Route Planner: Shown in 'planner' tab on mobile, and always on desktop */}
+            <div className={`${mobileTab === 'planner' ? 'block' : 'hidden lg:block'}`}>
+              <RoutePlanner
+                hubs={hubs}
+                originHub={originHub}
+                destHub={destHub}
+                routeData={routeData}
+                activeRouteView={activeRouteView}
+                cargoTier={cargoTier}
+                selectedRouteIndex={selectedRouteIndex}
+                isGpsEnabled={gps.isGpsEnabled}
+                userLocation={gps.userCoordinates}
+                isTracking={gps.isGpsEnabled}
+                isNavigating={gps.isNavigating}
+                onSetOrigin={setOriginHub}
+                onSetDestination={setDestHub}
+                onSetCargoTier={setCargoTier}
+                onRouteCalculated={(data) => {
+                  setRouteData(data);
+                  if (data?.selectedRouteIndex !== undefined) {
+                    setSelectedRouteIndex(data.selectedRouteIndex);
+                  }
+                }}
+                onSelectRouteView={setActiveRouteView}
+                onSelectCandidateRoute={handleSelectCandidateRoute}
+                onToggleAlternateHubs={() =>
+                  setShowAlternateHubs(!showAlternateHubs)
                 }
-              }}
-              onSelectRouteView={setActiveRouteView}
-              onSelectCandidateRoute={handleSelectCandidateRoute}
-              onToggleAlternateHubs={() =>
-                setShowAlternateHubs(!showAlternateHubs)
-              }
-              onClear={handleClear}
-              onUseCurrentLocation={handleUseCurrentLocation}
-              onStartNavigation={handleStartNavigation}
-              onStopNavigation={gps.stopNavigation}
-              onToggleGps={handleToggleGps}
-              onShipmentRegistered={(newShipment) => {
-                setShipments((prev) => [newShipment, ...prev]);
-                setTrackedShipment(newShipment);
-              }}
-            />
+                onClear={handleClear}
+                onUseCurrentLocation={handleUseCurrentLocation}
+                onStartNavigation={handleStartNavigation}
+                onStopNavigation={gps.stopNavigation}
+                onToggleGps={handleToggleGps}
+                onShipmentRegistered={(newShipment) => {
+                  setShipments((prev) => [newShipment, ...prev]);
+                  setTrackedShipment(newShipment);
+                }}
+              />
+            </div>
 
-            <DisruptionAlerts
-              disruptions={disruptions}
-              onSelectDisruption={handleSelectDisruption}
-              onDeleteDisruption={(id) => {
-                setDisruptions((prev) => prev.filter((d) => d.id !== id));
-              }}
-              onOpenReportModal={() => {
-                setClickedMapCoords({ latitude: 25.782, longitude: 93.921 });
-                setSimulationModalOpen(true);
-              }}
-            />
+            {/* Disruption Alerts: Shown in 'alerts' tab on mobile, and always on desktop */}
+            <div className={`${mobileTab === 'alerts' ? 'block' : 'hidden lg:block'}`}>
+              <DisruptionAlerts
+                disruptions={disruptions}
+                onSelectDisruption={(d) => {
+                  handleSelectDisruption(d);
+                  setMobileTab('map');
+                }}
+                onDeleteDisruption={(id) => {
+                  setDisruptions((prev) => prev.filter((d) => d.id !== id));
+                }}
+                onOpenReportModal={() => {
+                  setClickedMapCoords({ latitude: 25.782, longitude: 93.921 });
+                  setSimulationModalOpen(true);
+                }}
+              />
+            </div>
 
-            <ShipmentFeed
-              shipments={shipments}
-              selectedShipmentId={trackedShipment?.id}
-              onSelectShipment={(s) => setTrackedShipment(s)}
-            />
+            {/* Shipment Feed: Shown in 'fleet' tab on mobile, and always on desktop */}
+            <div className={`${mobileTab === 'fleet' ? 'block' : 'hidden lg:block'}`}>
+              <ShipmentFeed
+                shipments={shipments}
+                selectedShipmentId={trackedShipment?.id}
+                onSelectShipment={(s) => {
+                  setTrackedShipment(s);
+                  setMobileTab('map');
+                }}
+              />
+            </div>
           </div>
         </div>
       </main>
