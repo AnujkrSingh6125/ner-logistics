@@ -172,34 +172,39 @@ export default function RoutePlanner({
       : 0;
 
   return (
-    <div className="bg-white dark:bg-[#1c2541]/90 backdrop-blur rounded-xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-md space-y-3 text-slate-900 dark:text-slate-100 transition-colors duration-200">
+    <div className="bg-[#070e1c]/85 backdrop-blur-xl rounded-2xl p-4 border border-slate-800/80 shadow-[0_4px_24px_rgba(0,0,0,0.3)] space-y-3.5 text-slate-100 transition-colors duration-200">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Navigation className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
-          <h2 className="font-bold text-slate-800 dark:text-slate-100 text-sm">
-            Disaster-Resilient Route Engine
-          </h2>
+          <div className="w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+            <Navigation className="w-4 h-4" />
+          </div>
+          <div>
+            <h2 className="font-bold text-slate-100 text-sm">
+              Disaster-Resilient Route Engine
+            </h2>
+            <p className="text-[10px] text-slate-400">Multi-Corridor Risk Evaluation & Routing</p>
+          </div>
         </div>
-        <span className="text-[10px] text-cyan-700 dark:text-cyan-300 font-mono bg-cyan-50 dark:bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-200 dark:border-cyan-800/40 flex items-center gap-1 font-semibold">
-          Active Multi-Tier
+        <span className="text-[10px] text-cyan-300 font-mono font-bold bg-cyan-950/80 px-2 py-0.5 rounded-full border border-cyan-800/60 flex items-center gap-1">
+          Active Engine
         </span>
       </div>
 
       {/* Cargo Priority Tier Selector */}
-      <div className="bg-slate-50 dark:bg-slate-900/90 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+      <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800/90 space-y-2">
         <div className="flex items-center justify-between">
-          <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-            <Package className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+          <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
+            <Package className="w-3.5 h-3.5 text-cyan-400" />
             <span>Cargo Manifest & Priority Tier:</span>
           </label>
           <span
-            className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
+            className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold uppercase ${
               cargoTier === 'TIER_1_CRITICAL'
-                ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-300 dark:border-rose-800'
+                ? 'bg-rose-950 text-rose-300 border border-rose-800'
                 : cargoTier === 'TIER_2_ESSENTIAL'
-                ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
-                : 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-300 dark:border-blue-800'
+                ? 'bg-amber-950 text-amber-300 border border-amber-800'
+                : 'bg-blue-950 text-blue-300 border border-blue-800'
             }`}
           >
             Urgency: {cargoConfig.urgencyScore}/100
@@ -209,7 +214,7 @@ export default function RoutePlanner({
         <select
           value={cargoTier}
           onChange={(e) => onSetCargoTier(e.target.value as CargoTier)}
-          className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs rounded-lg px-2.5 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none font-medium"
+          className="w-full bg-[#081020] border border-slate-700/80 text-slate-100 text-xs rounded-xl px-3 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none font-medium"
         >
           <option value="TIER_1_CRITICAL">
             Tier 1 (Critical): Vaccines / Blood / Oxygen (Priority Bypass)
@@ -222,7 +227,7 @@ export default function RoutePlanner({
           </option>
         </select>
 
-        <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+        <p className="text-[10px] text-slate-400 leading-tight">
           {cargoConfig.description}
         </p>
       </div>
@@ -232,7 +237,7 @@ export default function RoutePlanner({
         {/* Origin Hub Selector with Dynamic GPS Privacy Switch */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
+            <label className="text-[11px] font-medium text-slate-400">
               Origin Strategic Hub:
             </label>
             <div className="flex items-center gap-1.5">
@@ -283,7 +288,7 @@ export default function RoutePlanner({
                 hubs.find((h) => h.id === e.target.value) || null;
               onSetOrigin(selected);
             }}
-            className="w-full bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs rounded-lg px-3 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none font-medium"
+            className="w-full bg-[#081020] border border-slate-700/80 text-slate-100 text-xs rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-cyan-500 focus:outline-none font-medium"
           >
             <option value="">-- Select Origin Hub (Manual) --</option>
             {isGpsEnabled && userLocation && (
@@ -305,7 +310,7 @@ export default function RoutePlanner({
             type="button"
             onClick={handleSwap}
             disabled={!originHub && !destHub}
-            className="p-1.5 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition disabled:opacity-30"
+            className="p-1.5 rounded-full bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-cyan-300 border border-slate-700/80 transition disabled:opacity-30 shadow-sm"
             title="Swap Origin & Destination"
           >
             <ArrowRightLeft className="w-3.5 h-3.5 rotate-90 md:rotate-0" />
@@ -314,7 +319,7 @@ export default function RoutePlanner({
 
         {/* Destination Hub Selector */}
         <div>
-          <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
+          <label className="block text-[11px] font-medium text-slate-400 mb-1">
             Destination Strategic Hub:
           </label>
           <select
@@ -324,7 +329,7 @@ export default function RoutePlanner({
                 hubs.find((h) => h.id === e.target.value) || null;
               onSetDestination(selected);
             }}
-            className="w-full bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs rounded-lg px-3 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none font-medium"
+            className="w-full bg-[#081020] border border-slate-700/80 text-slate-100 text-xs rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-cyan-500 focus:outline-none font-medium"
           >
             <option value="">-- Select Destination Hub --</option>
             {hubs.map((hub) => (
@@ -340,7 +345,7 @@ export default function RoutePlanner({
           <button
             onClick={handleCalculateRoute}
             disabled={!originHub || !destHub || loading}
-            className="flex-1 bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-semibold py-2 px-3 rounded-lg text-xs transition shadow-md flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex-1 bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold py-2.5 px-3 rounded-xl text-xs transition-all shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed border border-cyan-400/30"
           >
             {loading ? (
               <>

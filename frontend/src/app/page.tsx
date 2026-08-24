@@ -555,10 +555,10 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen lg:h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200 lg:overflow-hidden relative">
+    <div className="min-h-screen lg:h-screen flex flex-col bg-[#030712] text-slate-100 transition-colors duration-200 lg:overflow-hidden relative">
       {/* GPS Status Toast Notice */}
       {gps.statusMessage && (
-        <div className="fixed top-16 right-4 z-[9999] bg-slate-900/95 text-slate-100 border border-slate-700 px-3.5 py-2 rounded-xl shadow-2xl backdrop-blur text-xs font-semibold animate-in fade-in slide-in-from-top-2 duration-300 flex items-center gap-2">
+        <div className="fixed top-16 right-4 z-[9999] bg-slate-900/95 text-slate-100 border border-slate-700/80 px-3.5 py-2 rounded-xl shadow-2xl backdrop-blur-xl text-xs font-mono font-semibold animate-in fade-in slide-in-from-top-2 duration-300 flex items-center gap-2">
           <span>{gps.statusMessage}</span>
         </div>
       )}
@@ -597,20 +597,20 @@ export default function DashboardPage() {
           {/* Left Column: Tactical Geospatial Map (8 cols) */}
           <div className="lg:col-span-8 flex flex-col h-full min-h-0 space-y-2">
             {/* Map Layer Toolbar */}
-            <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-white dark:bg-[#1c2541]/90 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur transition-colors duration-200">
+            <div className="flex items-center justify-between px-3.5 py-1.5 rounded-2xl bg-[#070e1c]/85 border border-slate-800/80 shadow-md backdrop-blur-xl transition-colors duration-200">
               <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                <Layers className="w-4 h-4 text-cyan-400" />
+                <span className="text-xs font-bold text-slate-200">
                   GIS Layer Controls
                 </span>
                 {isSimulatingHazard && isGovOfficial && (
-                  <span className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-700/80 px-2 py-0.5 rounded-full font-mono flex items-center gap-1 font-semibold">
-                    <Sparkles className="w-2.5 h-2.5 text-amber-500 dark:text-amber-300" />
+                  <span className="text-[10px] bg-amber-950/80 text-amber-300 border border-amber-800/80 px-2 py-0.5 rounded-full font-mono flex items-center gap-1 font-semibold">
+                    <Sparkles className="w-2.5 h-2.5 text-amber-400" />
                     Hazard Simulation Active
                   </span>
                 )}
                 {gps.isNavigating && (
-                  <span className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 px-2 py-0.5 rounded-full font-mono flex items-center gap-1 font-bold animate-pulse">
+                  <span className="text-[10px] bg-emerald-950/80 text-emerald-300 border border-emerald-800/80 px-2 py-0.5 rounded-full font-mono flex items-center gap-1 font-bold animate-pulse">
                     <Navigation className="w-2.5 h-2.5" />
                     GPS Navigation Active
                   </span>
@@ -619,50 +619,50 @@ export default function DashboardPage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setShowHubs(!showHubs)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition text-[11px] font-medium ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition text-[11px] font-medium border ${
                     showHubs
-                      ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300 border border-blue-300 dark:border-blue-700/60'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                      ? 'bg-cyan-950/80 text-cyan-300 border-cyan-700/60 shadow-sm'
+                      : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200'
                   }`}
                 >
                   {showHubs ? (
-                    <Eye className="w-3 h-3" />
+                    <Eye className="w-3 h-3 text-cyan-400" />
                   ) : (
-                    <EyeOff className="w-3 h-3" />
+                    <EyeOff className="w-3 h-3 text-slate-500" />
                   )}
                   <span>Hubs</span>
                 </button>
                 <button
                   onClick={() => setShowDisruptions(!showDisruptions)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition text-[11px] font-medium ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition text-[11px] font-medium border ${
                     showDisruptions
-                      ? 'bg-red-100 text-red-800 dark:bg-red-900/60 dark:text-red-300 border border-red-300 dark:border-red-700/60'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                      ? 'bg-red-950/80 text-red-300 border-red-700/60 shadow-sm'
+                      : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200'
                   }`}
                 >
                   {showDisruptions ? (
-                    <Eye className="w-3 h-3" />
+                    <Eye className="w-3 h-3 text-red-400" />
                   ) : (
-                    <EyeOff className="w-3 h-3" />
+                    <EyeOff className="w-3 h-3 text-slate-500" />
                   )}
                   <span>Hazards</span>
                 </button>
                 <button
                   onClick={() => setShowBuffers(!showBuffers)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition text-[11px] font-medium ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition text-[11px] font-medium border ${
                     showBuffers
-                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                      ? 'bg-amber-950/80 text-amber-300 border-amber-700/60 shadow-sm'
+                      : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200'
                   }`}
                 >
-                  <CircleDot className="w-3 h-3" />
+                  <CircleDot className="w-3 h-3 text-amber-400" />
                   <span>Buffer Zones</span>
                 </button>
               </div>
             </div>
 
             {/* Map Display Container */}
-            <div className="flex-1 w-full min-h-0 h-full rounded-2xl overflow-hidden shadow-sm dark:shadow-md border border-slate-200 dark:border-slate-800 relative">
+            <div className="flex-1 w-full min-h-0 h-full rounded-2xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.4)] border border-slate-800/80 relative">
               <LogisticsMap
                 hubs={hubs}
                 disruptions={disruptions}
@@ -780,8 +780,8 @@ export default function DashboardPage() {
       <AuthModal />
 
       {/* Footer */}
-      <footer className="shrink-0 border-t border-slate-200 dark:border-slate-800/80 bg-white/80 dark:bg-[#0b132b]/80 py-2 text-center text-xs text-slate-600 dark:text-slate-400 transition-colors duration-200">
-        NER Smart Logistics Platform • Disaster-Resilient Corridor Monitoring Infrastructure
+      <footer className="shrink-0 border-t border-slate-800/80 bg-[#060c18]/90 py-2.5 text-center text-xs text-slate-400 font-mono transition-colors duration-200">
+        NER Smart Logistics Platform • Military/Enterprise Disaster-Resilient Corridor Monitoring Infrastructure
       </footer>
     </div>
   );

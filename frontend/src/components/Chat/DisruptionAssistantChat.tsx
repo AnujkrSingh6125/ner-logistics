@@ -174,9 +174,9 @@ export default function DisruptionAssistantChat({
 
       {/* Floating Chat Modal */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-[9999] w-[92vw] sm:w-[420px] h-[540px] max-h-[85vh] bg-white dark:bg-[#151f38] border border-slate-200 dark:border-slate-700/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 duration-200">
+        <div className="fixed bottom-6 right-6 z-[9999] w-[92vw] sm:w-[420px] h-[540px] max-h-[85vh] bg-[#070e1c]/95 backdrop-blur-2xl border border-slate-700/80 rounded-3xl shadow-[0_16px_48px_rgba(0,0,0,0.7)] flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 duration-200">
           {/* Header */}
-          <div className="px-4 py-3 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white border-b border-slate-800 flex items-center justify-between">
+          <div className="px-4 py-3 bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 text-white border-b border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300">
                 <Bot className="w-4 h-4" />
@@ -191,8 +191,8 @@ export default function DisruptionAssistantChat({
                     Strict Grounding
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-400">
-                  Zero Hallucination • {activeHazardsCount} Live Hazards Active
+                <p className="text-[10px] text-slate-400 font-mono">
+                  Zero Hallucination • {activeHazardsCount} Live Radar Alerts
                 </p>
               </div>
             </div>
@@ -215,13 +215,13 @@ export default function DisruptionAssistantChat({
           </div>
 
           {/* Quick Context Banner */}
-          <div className="bg-amber-50 dark:bg-amber-950/40 px-3 py-1.5 border-b border-amber-200 dark:border-amber-900/40 flex items-center gap-1.5 text-[10px] text-amber-800 dark:text-amber-300">
-            <Info className="w-3.5 h-3.5 shrink-0" />
-            <span>Answers strictly cite official entries from BRO, ASDMA, NHAI, & State SDMAs.</span>
+          <div className="bg-amber-950/40 px-3.5 py-1.5 border-b border-amber-900/40 flex items-center gap-1.5 text-[10px] text-amber-300 font-mono">
+            <Info className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+            <span>Strictly grounded to BRO, ASDMA, NHAI, & Police entries.</span>
           </div>
 
           {/* Messages Area */}
-          <div className="flex-1 p-3.5 overflow-y-auto space-y-3 text-xs bg-slate-50/60 dark:bg-slate-900/40">
+          <div className="flex-1 p-3.5 overflow-y-auto space-y-3 text-xs bg-[#040812]/70 custom-scrollbar">
             {messages.map((m) => (
               <div
                 key={m.id}
@@ -238,8 +238,8 @@ export default function DisruptionAssistantChat({
                 <div
                   className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 shadow-sm text-xs leading-relaxed ${
                     m.sender === 'user'
-                      ? 'bg-blue-600 text-white rounded-br-none'
-                      : 'bg-white dark:bg-[#1c2541] text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700/80 rounded-bl-none'
+                      ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-br-none'
+                      : 'bg-slate-900/90 text-slate-100 border border-slate-700/80 rounded-bl-none'
                   }`}
                 >
                   <div className="whitespace-pre-line">
@@ -257,7 +257,7 @@ export default function DisruptionAssistantChat({
                                   className={
                                     m.sender === 'user'
                                       ? 'font-bold'
-                                      : 'font-bold text-cyan-700 dark:text-cyan-300'
+                                      : 'font-bold text-cyan-300'
                                   }
                                 >
                                   {p.slice(2, -2)}
@@ -276,15 +276,15 @@ export default function DisruptionAssistantChat({
 
                   {/* Citations Badges */}
                   {m.citations && m.citations.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700 flex flex-wrap gap-1 items-center">
-                      <span className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold flex items-center gap-0.5">
+                    <div className="mt-2 pt-2 border-t border-slate-700 flex flex-wrap gap-1 items-center">
+                      <span className="text-[9px] text-slate-400 font-semibold flex items-center gap-0.5">
                         <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
                         Source:
                       </span>
                       {m.citations.map((c, cIdx) => (
                         <span
                           key={cIdx}
-                          className="text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-cyan-300 border border-slate-300 dark:border-slate-700 px-1.5 py-0.2 rounded font-mono font-medium"
+                          className="text-[9px] bg-slate-800 text-cyan-300 border border-slate-700 px-1.5 py-0.2 rounded font-mono font-medium"
                         >
                           {c}
                         </span>
@@ -292,7 +292,7 @@ export default function DisruptionAssistantChat({
                     </div>
                   )}
 
-                  <div className="text-[9px] text-right mt-1 opacity-70">
+                  <div className="mt-1 text-[9px] text-right opacity-60 font-mono">
                     {m.timestamp}
                   </div>
                 </div>
@@ -311,9 +311,9 @@ export default function DisruptionAssistantChat({
                 <div className="w-6 h-6 rounded-lg bg-cyan-600/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
                   <Bot className="w-3.5 h-3.5" />
                 </div>
-                <div className="bg-white dark:bg-[#1c2541] border border-slate-200 dark:border-slate-700 px-3.5 py-2.5 rounded-2xl rounded-bl-none shadow-sm flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-500" />
-                  <span>Evaluating live database records...</span>
+                <div className="bg-slate-900 border border-slate-800 px-3.5 py-2.5 rounded-2xl rounded-bl-none shadow-sm flex items-center gap-2 text-slate-400 text-xs font-mono">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400" />
+                  <span>Evaluating verified database records...</span>
                 </div>
               </div>
             )}
@@ -322,13 +322,13 @@ export default function DisruptionAssistantChat({
           </div>
 
           {/* Quick Prompt Chips */}
-          <div className="px-3 py-2 bg-slate-100 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex gap-1.5 overflow-x-auto no-scrollbar">
+          <div className="px-3 py-2 bg-slate-950 border-t border-slate-800 flex gap-1.5 overflow-x-auto no-scrollbar">
             {promptChips.map((chip, idx) => (
               <button
                 key={idx}
                 onClick={() => handleSendMessage(chip)}
                 disabled={isLoading}
-                className="whitespace-nowrap text-[10px] bg-white dark:bg-[#1c2541] hover:bg-cyan-50 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:border-cyan-400 text-slate-700 dark:text-slate-300 hover:text-cyan-700 dark:hover:text-cyan-300 px-2.5 py-1 rounded-full transition font-medium shadow-2xs shrink-0"
+                className="whitespace-nowrap text-[10px] bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-cyan-400 text-slate-300 hover:text-cyan-300 px-2.5 py-1 rounded-full transition font-medium shrink-0"
               >
                 {chip}
               </button>
@@ -336,7 +336,7 @@ export default function DisruptionAssistantChat({
           </div>
 
           {/* Input Footer */}
-          <div className="p-3 bg-white dark:bg-[#151f38] border-t border-slate-200 dark:border-slate-800 flex items-center gap-2">
+          <div className="p-3 bg-slate-950 border-t border-slate-800 flex items-center gap-2">
             <input
               ref={inputRef}
               type="text"
@@ -345,12 +345,12 @@ export default function DisruptionAssistantChat({
               onKeyDown={handleKeyDown}
               disabled={isLoading}
               placeholder="Ask about highway status, landslides..."
-              className="flex-1 bg-slate-100 dark:bg-slate-900/90 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-3.5 py-2 text-xs focus:ring-2 focus:ring-cyan-500 focus:outline-none placeholder-slate-400"
+              className="flex-1 bg-slate-900 border border-slate-700 text-slate-100 rounded-xl px-3.5 py-2 text-xs focus:ring-2 focus:ring-cyan-500 focus:outline-none placeholder-slate-500"
             />
             <button
               onClick={() => handleSendMessage()}
               disabled={isLoading || !query.trim()}
-              className="bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white p-2.5 rounded-xl shadow transition"
+              className="bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white p-2.5 rounded-xl shadow-md shadow-cyan-600/30 transition"
               aria-label="Send message"
             >
               {isLoading ? (
