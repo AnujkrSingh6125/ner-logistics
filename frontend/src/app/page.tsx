@@ -993,7 +993,7 @@ export default function DashboardPage() {
                 onStopNavigation={gps.stopNavigation}
                 onToggleGps={handleToggleGps}
                 onShipmentRegistered={(newShipment) => {
-                  setShipments((prev) => [newShipment, ...prev]);
+                  setShipments((prev) => [newShipment, ...prev.filter((s) => s.id !== newShipment.id)]);
                   setTrackedShipment(newShipment);
                 }}
               />

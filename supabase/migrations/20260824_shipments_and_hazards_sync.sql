@@ -117,12 +117,25 @@ USING (
     OR true
 );
 
--- 4. Realtime Subscriptions Publication for Shipments, Hazards & Hubs
+-- 4. Realtime Subscriptions Publication for Shipments, Hazards, Road Disruptions & Hubs
+ALTER TABLE public.road_disruptions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow global select on road_disruptions" ON public.road_disruptions;
+CREATE POLICY "Allow global select on road_disruptions" ON public.road_disruptions FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow insert on road_disruptions" ON public.road_disruptions;
+CREATE POLICY "Allow insert on road_disruptions" ON public.road_disruptions FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow update on road_disruptions" ON public.road_disruptions;
+CREATE POLICY "Allow update on road_disruptions" ON public.road_disruptions FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow delete on road_disruptions" ON public.road_disruptions;
+CREATE POLICY "Allow delete on road_disruptions" ON public.road_disruptions FOR DELETE USING (true);
+
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
         ALTER PUBLICATION supabase_realtime ADD TABLE public.shipments;
         ALTER PUBLICATION supabase_realtime ADD TABLE public.road_disruptions;
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'hazards') THEN
+            ALTER PUBLICATION supabase_realtime ADD TABLE public.hazards;
+        END IF;
         ALTER PUBLICATION supabase_realtime ADD TABLE public.supply_hubs;
     END IF;
 EXCEPTION

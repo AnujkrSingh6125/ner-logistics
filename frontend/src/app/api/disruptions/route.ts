@@ -17,10 +17,16 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     // RBAC Guard: Verify that the requester is an authorized Government Official
-    const userRole = request.headers.get('x-user-role');
+    const userRole = (request.headers.get('x-user-role') || '').trim();
     const userAgency = request.headers.get('x-user-agency');
 
-    if (userRole !== 'gov_official') {
+    const isGov =
+      userRole === 'gov_official' ||
+      userRole === 'GOV_AUTHORITY' ||
+      userRole === 'government_official' ||
+      userRole === 'admin';
+
+    if (!isGov) {
       return NextResponse.json(
         {
           error:
@@ -89,8 +95,14 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     // RBAC Guard
-    const userRole = request.headers.get('x-user-role');
-    if (userRole !== 'gov_official') {
+    const userRole = (request.headers.get('x-user-role') || '').trim();
+    const isGov =
+      userRole === 'gov_official' ||
+      userRole === 'GOV_AUTHORITY' ||
+      userRole === 'government_official' ||
+      userRole === 'admin';
+
+    if (!isGov) {
       return NextResponse.json(
         {
           error:

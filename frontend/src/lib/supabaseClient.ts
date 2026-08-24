@@ -700,6 +700,7 @@ export async function insertSimulatedDisruption(
 
   // Also add to memory store for immediate reactivity
   simulatedDisruptionsMemory = [createdDisruption, ...simulatedDisruptionsMemory];
+  broadcastCrossSessionEvent({ type: 'hazard_insert', payload: createdDisruption });
   return createdDisruption;
 }
 
@@ -707,6 +708,7 @@ export async function insertSimulatedDisruption(
 export async function deleteRoadDisruption(id: string): Promise<boolean> {
   // Remove from local memory
   simulatedDisruptionsMemory = simulatedDisruptionsMemory.filter((d) => d.id !== id);
+  broadcastCrossSessionEvent({ type: 'hazard_delete', payload: id });
 
   if (supabase) {
     try {
@@ -920,6 +922,7 @@ export async function insertShipment(
   }
 
   activeShipmentsMemory = [newShipment, ...activeShipmentsMemory.filter((s) => s.id !== newShipment.id)];
+  broadcastCrossSessionEvent({ type: 'shipment_insert', payload: newShipment });
   return newShipment;
 }
 
@@ -958,6 +961,7 @@ export async function deleteShipment(
 
   // Optimistically remove from local memory store
   activeShipmentsMemory = activeShipmentsMemory.filter((s) => s.id !== shipmentId);
+  broadcastCrossSessionEvent({ type: 'shipment_delete', payload: shipmentId });
 
   // Execute database deletion
   if (supabase) {
@@ -1015,6 +1019,11 @@ export async function updateShipmentTelemetry(
     return s;
   });
 
+  broadcastCrossSessionEvent({
+    type: 'shipment_telemetry',
+    payload: { id: shipmentId, telemetry },
+  });
+
   if (supabase) {
     try {
       const { error } = await supabase
@@ -1034,6 +1043,58 @@ export async function updateShipmentTelemetry(
     }
   }
   return false;
+}
+
+// ============================================================================
+// Realtime Universal Cross-Session & Cross-Tab Synchronization Engine
+// ============================================================================
+export type RealtimeSyncEvent =
+  | { type: 'shipment_insert'; payload: Shipment }
+  | { type: 'shipment_update'; payload: Shipment }
+  | { type: 'shipment_delete'; payload: string }
+  | { type: 'shipment_telemetry'; payload: { id: string; telemetry: any } }
+  | { type: 'hazard_insert'; payload: RoadDisruption }
+  | { type: 'hazard_update'; payload: RoadDisruption }
+  | { type: 'hazard_delete'; payload: string };
+
+let crossTabChannel: BroadcastChannel | null = null;
+if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+  try {
+    crossTabChannel = new BroadcastChannel('ner_logistics_realtime_sync');
+  } catch (e) {
+    crossTabChannel = null;
+  }
+}
+
+export function broadcastCrossSessionEvent(event: RealtimeSyncEvent) {
+  // 1. Cross-tab instant propagation (0ms)
+  if (crossTabChannel) {
+    try {
+      crossTabChannel.postMessage(event);
+    } catch (e) {}
+  }
+
+  // 2. Storage event fallback for cross-tab sync
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      localStorage.setItem(
+        'ner_logistics_sync_pulse',
+        JSON.stringify({ event, timestamp: Date.now() })
+      );
+    } catch (e) {}
+  }
+
+  // 3. Supabase Realtime broadcast message over active websocket channel
+  if (supabase) {
+    try {
+      const channel = supabase.channel('realtime-fleet-broadcast');
+      channel.send({
+        type: 'broadcast',
+        event: event.type,
+        payload: event.payload,
+      });
+    } catch (e) {}
+  }
 }
 
 // Supabase Realtime WebSocket subscription for a single shipment
@@ -1076,40 +1137,102 @@ export function subscribeToAllShipmentsRealtime(
   onUpdate: (shipment: Shipment) => void,
   onDelete?: (deletedId: string) => void
 ) {
-  if (!supabase) return () => {};
+  const cleanupFns: Array<() => void> = [];
 
-  try {
-    console.log('[SUPABASE REALTIME] Subscribing to public:shipments broadcast channel...');
-    const channel = supabase
-      .channel('realtime-all-shipments')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'shipments',
-        },
-        (payload: any) => {
-          console.log('[SUPABASE REALTIME SHIPMENTS POSTGRES_CHANGE]', payload.eventType, payload);
-          if (payload.eventType === 'DELETE' && payload.old?.id && onDelete) {
-            onDelete(String(payload.old.id));
-          } else if (payload.new) {
-            const normalized = normalizeShipment(payload.new);
-            onUpdate(normalized);
-          }
+  // 1. Native Cross-Tab BroadcastChannel Listener
+  if (crossTabChannel) {
+    const handleBroadcastMsg = (ev: MessageEvent) => {
+      const data = ev.data as RealtimeSyncEvent;
+      if (!data) return;
+
+      if (data.type === 'shipment_insert' || data.type === 'shipment_update') {
+        onUpdate(data.payload);
+      } else if (data.type === 'shipment_delete' && onDelete) {
+        onDelete(data.payload);
+      } else if (data.type === 'shipment_telemetry') {
+        const existing = activeShipmentsMemory.find((s) => s.id === data.payload.id);
+        if (existing) {
+          onUpdate({
+            ...existing,
+            current_lat: data.payload.telemetry.current_lat,
+            current_lng: data.payload.telemetry.current_lng,
+            heading: data.payload.telemetry.heading ?? existing.heading,
+            speed: data.payload.telemetry.speed ?? existing.speed,
+          });
         }
-      )
-      .subscribe((status) => {
-        console.log('[SUPABASE REALTIME SHIPMENTS CHANNEL SUBSCRIPTION STATUS]:', status);
-      });
-
-    return () => {
-      supabase.removeChannel(channel);
+      }
     };
-  } catch (err) {
-    console.warn('Realtime all shipments subscription error:', err);
-    return () => {};
+
+    crossTabChannel.addEventListener('message', handleBroadcastMsg);
+    cleanupFns.push(() => crossTabChannel?.removeEventListener('message', handleBroadcastMsg));
   }
+
+  // 2. Storage event fallback listener
+  if (typeof window !== 'undefined') {
+    const handleStorageEvent = (ev: StorageEvent) => {
+      if (ev.key === 'ner_logistics_sync_pulse' && ev.newValue) {
+        try {
+          const parsed = JSON.parse(ev.newValue);
+          const data = parsed.event as RealtimeSyncEvent;
+          if (data.type === 'shipment_insert' || data.type === 'shipment_update') {
+            onUpdate(data.payload);
+          } else if (data.type === 'shipment_delete' && onDelete) {
+            onDelete(data.payload);
+          }
+        } catch (e) {}
+      }
+    };
+    window.addEventListener('storage', handleStorageEvent);
+    cleanupFns.push(() => window.removeEventListener('storage', handleStorageEvent));
+  }
+
+  // 3. Supabase Realtime postgres_changes + WebSocket Broadcast
+  if (supabase) {
+    try {
+      console.log('[SUPABASE REALTIME] Subscribing to public:shipments broadcast channel...');
+      const channel = supabase
+        .channel('realtime-all-shipments')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'shipments',
+          },
+          (payload: any) => {
+            console.log('[SUPABASE REALTIME SHIPMENTS POSTGRES_CHANGE]', payload.eventType, payload);
+            if (payload.eventType === 'DELETE' && payload.old?.id && onDelete) {
+              onDelete(String(payload.old.id));
+            } else if (payload.new) {
+              const normalized = normalizeShipment(payload.new);
+              onUpdate(normalized);
+            }
+          }
+        )
+        .on('broadcast', { event: 'shipment_insert' }, (msg: any) => {
+          if (msg.payload) onUpdate(normalizeShipment(msg.payload));
+        })
+        .on('broadcast', { event: 'shipment_update' }, (msg: any) => {
+          if (msg.payload) onUpdate(normalizeShipment(msg.payload));
+        })
+        .on('broadcast', { event: 'shipment_delete' }, (msg: any) => {
+          if (msg.payload && onDelete) onDelete(String(msg.payload));
+        })
+        .subscribe((status) => {
+          console.log('[SUPABASE REALTIME SHIPMENTS CHANNEL SUBSCRIPTION STATUS]:', status);
+        });
+
+      cleanupFns.push(() => {
+        supabase.removeChannel(channel);
+      });
+    } catch (err) {
+      console.warn('Realtime all shipments subscription error:', err);
+    }
+  }
+
+  return () => {
+    cleanupFns.forEach((fn) => fn());
+  };
 }
 
 // Supabase Realtime WebSocket subscription for hazards/disruptions
@@ -1118,77 +1241,132 @@ export function subscribeToAllHazardsRealtime(
   onUpdate: (hazard: RoadDisruption) => void,
   onDelete: (id: string) => void
 ) {
-  if (!supabase) return () => {};
+  const cleanupFns: Array<() => void> = [];
 
-  try {
-    console.log('[SUPABASE REALTIME] Subscribing to public:road_disruptions & hazards broadcast channels...');
-    const channel = supabase
-      .channel('realtime-hazards-corridor')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'road_disruptions' },
-        (payload: any) => {
-          console.log('[SUPABASE REALTIME ROAD_DISRUPTIONS EVENT]:', payload.eventType, payload);
-          if (payload.eventType === 'INSERT' && payload.new) {
-            onInsert(payload.new as RoadDisruption);
-          } else if (payload.eventType === 'UPDATE' && payload.new) {
-            onUpdate(payload.new as RoadDisruption);
-          } else if (payload.eventType === 'DELETE' && payload.old) {
-            onDelete(payload.old.id);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'hazards' },
-        (payload: any) => {
-          console.log('[SUPABASE REALTIME HAZARDS EVENT]:', payload.eventType, payload);
-          if (payload.eventType === 'INSERT' && payload.new) {
-            const h = payload.new;
-            onInsert({
-              id: h.id,
-              title: h.title || h.name || 'Hazard Alert',
-              disruption_type: h.disruption_type || h.hazard_type || 'LANDSLIDE',
-              severity: h.severity || 'HIGH',
-              risk_radius_meters: h.risk_radius_meters || h.radius_meters || 1000,
-              latitude: Number(h.latitude || h.lat),
-              longitude: Number(h.longitude || h.lng),
-              message: h.message || h.description || '',
-              description: h.description || h.message || '',
-              is_active: h.is_active ?? true,
-              is_simulated: h.is_simulated ?? false,
-              created_at: h.created_at || new Date().toISOString(),
-            } as RoadDisruption);
-          } else if (payload.eventType === 'UPDATE' && payload.new) {
-            const h = payload.new;
-            onUpdate({
-              id: h.id,
-              title: h.title || h.name || 'Hazard Alert',
-              disruption_type: h.disruption_type || h.hazard_type || 'LANDSLIDE',
-              severity: h.severity || 'HIGH',
-              risk_radius_meters: h.risk_radius_meters || h.radius_meters || 1000,
-              latitude: Number(h.latitude || h.lat),
-              longitude: Number(h.longitude || h.lng),
-              message: h.message || h.description || '',
-              description: h.description || h.message || '',
-              is_active: h.is_active ?? true,
-              is_simulated: h.is_simulated ?? false,
-              created_at: h.created_at || new Date().toISOString(),
-            } as RoadDisruption);
-          } else if (payload.eventType === 'DELETE' && payload.old) {
-            onDelete(payload.old.id);
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log('[SUPABASE REALTIME HAZARDS CHANNEL SUBSCRIPTION STATUS]:', status);
-      });
+  // 1. Native Cross-Tab BroadcastChannel Listener
+  if (crossTabChannel) {
+    const handleBroadcastMsg = (ev: MessageEvent) => {
+      const data = ev.data as RealtimeSyncEvent;
+      if (!data) return;
 
-    return () => {
-      supabase.removeChannel(channel);
+      if (data.type === 'hazard_insert') {
+        onInsert(data.payload);
+      } else if (data.type === 'hazard_update') {
+        onUpdate(data.payload);
+      } else if (data.type === 'hazard_delete') {
+        onDelete(data.payload);
+      }
     };
-  } catch (err) {
-    console.warn('Realtime hazards subscription error:', err);
-    return () => {};
+
+    crossTabChannel.addEventListener('message', handleBroadcastMsg);
+    cleanupFns.push(() => crossTabChannel?.removeEventListener('message', handleBroadcastMsg));
   }
+
+  // 2. Storage event fallback listener
+  if (typeof window !== 'undefined') {
+    const handleStorageEvent = (ev: StorageEvent) => {
+      if (ev.key === 'ner_logistics_sync_pulse' && ev.newValue) {
+        try {
+          const parsed = JSON.parse(ev.newValue);
+          const data = parsed.event as RealtimeSyncEvent;
+          if (data.type === 'hazard_insert') {
+            onInsert(data.payload);
+          } else if (data.type === 'hazard_update') {
+            onUpdate(data.payload);
+          } else if (data.type === 'hazard_delete') {
+            onDelete(data.payload);
+          }
+        } catch (e) {}
+      }
+    };
+    window.addEventListener('storage', handleStorageEvent);
+    cleanupFns.push(() => window.removeEventListener('storage', handleStorageEvent));
+  }
+
+  // 3. Supabase Realtime postgres_changes + WebSocket Broadcast
+  if (supabase) {
+    try {
+      console.log('[SUPABASE REALTIME] Subscribing to public:road_disruptions & hazards broadcast channels...');
+      const channel = supabase
+        .channel('realtime-hazards-corridor')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'road_disruptions' },
+          (payload: any) => {
+            console.log('[SUPABASE REALTIME ROAD_DISRUPTIONS EVENT]:', payload.eventType, payload);
+            if (payload.eventType === 'INSERT' && payload.new) {
+              onInsert(payload.new as RoadDisruption);
+            } else if (payload.eventType === 'UPDATE' && payload.new) {
+              onUpdate(payload.new as RoadDisruption);
+            } else if (payload.eventType === 'DELETE' && payload.old) {
+              onDelete(payload.old.id);
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'hazards' },
+          (payload: any) => {
+            console.log('[SUPABASE REALTIME HAZARDS EVENT]:', payload.eventType, payload);
+            if (payload.eventType === 'INSERT' && payload.new) {
+              const h = payload.new;
+              onInsert({
+                id: h.id,
+                title: h.title || h.name || 'Hazard Alert',
+                disruption_type: h.disruption_type || h.hazard_type || 'LANDSLIDE',
+                severity: h.severity || 'HIGH',
+                risk_radius_meters: h.risk_radius_meters || h.radius_meters || 1000,
+                latitude: Number(h.latitude || h.lat),
+                longitude: Number(h.longitude || h.lng),
+                message: h.message || h.description || '',
+                description: h.description || h.message || '',
+                is_active: h.is_active ?? true,
+                is_simulated: h.is_simulated ?? false,
+                created_at: h.created_at || new Date().toISOString(),
+              } as RoadDisruption);
+            } else if (payload.eventType === 'UPDATE' && payload.new) {
+              const h = payload.new;
+              onUpdate({
+                id: h.id,
+                title: h.title || h.name || 'Hazard Alert',
+                disruption_type: h.disruption_type || h.hazard_type || 'LANDSLIDE',
+                severity: h.severity || 'HIGH',
+                risk_radius_meters: h.risk_radius_meters || h.radius_meters || 1000,
+                latitude: Number(h.latitude || h.lat),
+                longitude: Number(h.longitude || h.lng),
+                message: h.message || h.description || '',
+                description: h.description || h.message || '',
+                is_active: h.is_active ?? true,
+                is_simulated: h.is_simulated ?? false,
+                created_at: h.created_at || new Date().toISOString(),
+              } as RoadDisruption);
+            } else if (payload.eventType === 'DELETE' && payload.old) {
+              onDelete(payload.old.id);
+            }
+          }
+        )
+        .on('broadcast', { event: 'hazard_insert' }, (msg: any) => {
+          if (msg.payload) onInsert(msg.payload);
+        })
+        .on('broadcast', { event: 'hazard_update' }, (msg: any) => {
+          if (msg.payload) onUpdate(msg.payload);
+        })
+        .on('broadcast', { event: 'hazard_delete' }, (msg: any) => {
+          if (msg.payload) onDelete(String(msg.payload));
+        })
+        .subscribe((status) => {
+          console.log('[SUPABASE REALTIME HAZARDS CHANNEL SUBSCRIPTION STATUS]:', status);
+        });
+
+      cleanupFns.push(() => {
+        supabase.removeChannel(channel);
+      });
+    } catch (err) {
+      console.warn('Realtime hazards subscription error:', err);
+    }
+  }
+
+  return () => {
+    cleanupFns.forEach((fn) => fn());
+  };
 }
