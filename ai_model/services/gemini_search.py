@@ -571,7 +571,8 @@ def chat_road_disruptions(query: str, disruptions: Optional[List[Dict[str, Any]]
             "latitude": d.get("latitude"),
             "longitude": d.get("longitude"),
             "risk_radius_meters": d.get("risk_radius_meters"),
-            "description": d.get("description"),
+            "message": d.get("message") or d.get("description"),
+            "description": d.get("description") or d.get("message"),
             "government_body_name": d.get("government_body_name") or d.get("reported_by_agency", "Emergency Authority"),
         })
 
@@ -592,7 +593,8 @@ User Question: "{query}"
 Instructions:
 1. Provide a professional, concise operational answer.
 2. Whenever you cite an active disruption, ALWAYS cite the reporting agency/government body (e.g. `[Reported by: BRO Project Vartak]`, `[Reported by: Assam SDMA]`).
-3. If the user asks about a route/highway/corridor NOT in the database, output ONLY: "No active government-reported disruptions are recorded for this corridor."
+3. If an official government directive `message` is recorded for the hazard, quote the directive in quotation marks so the user has the official statement.
+4. If the user asks about a route/highway/corridor NOT in the database, output ONLY: "No active government-reported disruptions are recorded for this corridor."
 """
 
     candidate_models = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]

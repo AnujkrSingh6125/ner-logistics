@@ -68,7 +68,8 @@ export async function POST(request: NextRequest) {
             latitude: d.latitude,
             longitude: d.longitude,
             risk_radius_meters: d.risk_radius_meters,
-            description: d.description,
+            message: d.message || d.description,
+            description: d.description || d.message,
             government_body_name:
               d.government_body_name || d.reported_by_agency || 'Emergency Management Authority',
           })),
@@ -105,27 +106,29 @@ export async function POST(request: NextRequest) {
       const highway = String(d.highway_reference || '').toLowerCase();
       const dtype = String(d.disruption_type || '').toLowerCase();
       const desc = String(d.description || '').toLowerCase();
+      const msg = String(d.message || '').toLowerCase();
+      const agency = String(d.government_body_name || d.reported_by_agency || '').toLowerCase();
 
       if (
         (queryLower.includes('landslide') || queryLower.includes('mudslide') || queryLower.includes('slope')) &&
-        (dtype.includes('landslide') || title.includes('landslide') || desc.includes('landslide'))
+        (dtype.includes('landslide') || title.includes('landslide') || desc.includes('landslide') || msg.includes('landslide'))
       ) {
         matchedRecords.push(d);
       } else if (
         (queryLower.includes('flood') || queryLower.includes('inundat') || queryLower.includes('water')) &&
-        (dtype.includes('flood') || title.includes('flood') || desc.includes('flood'))
+        (dtype.includes('flood') || title.includes('flood') || desc.includes('flood') || msg.includes('flood'))
       ) {
         matchedRecords.push(d);
       } else if (
         (queryLower.includes('bridge') || queryLower.includes('scour') || queryLower.includes('culvert')) &&
-        (dtype.includes('bridge') || desc.includes('bridge'))
+        (dtype.includes('bridge') || desc.includes('bridge') || msg.includes('bridge'))
       ) {
         matchedRecords.push(d);
       } else if (highway && (highway.includes(queryLower) || queryLower.includes(highway.replace(/[\s\/-]/g, '')))) {
         matchedRecords.push(d);
       } else if (
         (queryLower.includes('nh-29') || queryLower.includes('nh29') || queryLower.includes('dimapur') || queryLower.includes('kohima') || queryLower.includes('pagla')) &&
-        (highway.includes('nh-29') || title.includes('kohima') || title.includes('dimapur') || desc.includes('pagla'))
+        (highway.includes('nh-29') || title.includes('kohima') || title.includes('dimapur') || desc.includes('pagla') || msg.includes('pagla'))
       ) {
         matchedRecords.push(d);
       } else if (
@@ -133,13 +136,19 @@ export async function POST(request: NextRequest) {
         (highway.includes('nh-6') || title.includes('silchar') || desc.includes('barak') || desc.includes('umiam'))
       ) {
         matchedRecords.push(d);
+      } else if (agency && queryLower.includes(agency)) {
+        matchedRecords.push(d);
       } else if (
         queryLower.includes('all') ||
         queryLower.includes('list') ||
         queryLower.includes('summary') ||
         queryLower.includes('critical') ||
         queryLower.includes('status') ||
-        queryLower.includes('active')
+        queryLower.includes('active') ||
+        queryLower.includes('directive') ||
+        queryLower.includes('message') ||
+        queryLower.includes('hazard') ||
+        queryLower.includes('disruption')
       ) {
         matchedRecords.push(d);
       }
@@ -158,15 +167,20 @@ export async function POST(request: NextRequest) {
     }
 
     const lines: string[] = [
-      '**Official Road Disruption Intelligence Assessment:**\n',
+      '**Official Government Disruption Intelligence Assessment:**\n',
     ];
 
     uniqueMatches.forEach((d) => {
       const agency = d.government_body_name || d.reported_by_agency || 'Emergency Management Authority';
       lines.push(`• **${d.title}** (${d.highway_reference || 'Regional Highway'})`);
-      lines.push(`  *Severity:* **${d.severity}** | *Radius:* ${d.risk_radius_meters || 1000}m`);
-      lines.push(`  ${d.description || 'Active road blockage reported.'}`);
-      lines.push(`  *(Reported by: **${agency}**)*\n`);
+      lines.push(`  *Severity:* **${d.severity}** | *Risk Radius:* ${d.risk_radius_meters || 1000}m | *Reporting Body:* **${agency}**`);
+      if (d.message) {
+        lines.push(`  *Official Directive:* &ldquo;${d.message}&rdquo;`);
+      }
+      if (d.description && d.description !== d.message) {
+        lines.push(`  *Field Notes:* ${d.description}`);
+      }
+      lines.push(`  *(Verified Government Record)*\n`);
     });
 
     const citations = Array.from(

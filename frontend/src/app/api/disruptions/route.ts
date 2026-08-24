@@ -39,7 +39,9 @@ export async function POST(request: NextRequest) {
       longitude,
       risk_radius_meters = 2500,
       highway_reference = 'Regional Highway',
+      message,
       description = 'Official disaster hazard broadcast injected by verified authority.',
+      government_body_name,
     } = body;
 
     if (!title || !latitude || !longitude || !disruption_type || !severity) {
@@ -52,6 +54,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const agency = government_body_name || userAgency || 'Government Disaster Management Authority';
+    const officialMessage = message ? message.slice(0, 500) : description;
+
     const newDisruption = await insertSimulatedDisruption({
       title,
       disruption_type,
@@ -60,8 +65,10 @@ export async function POST(request: NextRequest) {
       longitude: Number(longitude),
       risk_radius_meters: Number(risk_radius_meters),
       highway_reference,
-      description: `${description} [Reported by: ${userAgency || 'Gov Official'}]`,
-      reported_by_agency: userAgency || 'Government Disaster Management Authority',
+      message: officialMessage,
+      government_body_name: agency,
+      description: `${description || officialMessage} [Reported by: ${agency}]`,
+      reported_by_agency: agency,
       verified_by_official: 'Verified Command Official',
     });
 

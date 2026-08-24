@@ -13,6 +13,9 @@ import {
   Building2,
   Loader2,
   ShieldCheck,
+  Bot,
+  Sparkles,
+  MessageSquare,
 } from 'lucide-react';
 
 interface DisruptionAlertsProps {
@@ -31,6 +34,16 @@ export default function DisruptionAlerts({
   const { user } = useAuth();
   const [filterSeverity, setFilterSeverity] = useState<string>('ALL');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleAskAboutDisruption = (e: React.MouseEvent, d: RoadDisruption) => {
+    e.stopPropagation();
+    const event = new CustomEvent('ask-disruption-assistant', {
+      detail: {
+        query: `What are the official government directives, severity, and status for "${d.title}" on ${d.highway_reference || 'this corridor'}?`,
+      },
+    });
+    window.dispatchEvent(event);
+  };
 
   const filteredDisruptions = disruptions.filter((d) => {
     if (filterSeverity === 'ALL') return true;
@@ -204,7 +217,20 @@ export default function DisruptionAlerts({
                   </p>
                 )}
 
-                <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200 dark:border-slate-800">
+                {/* Ask Gemini AI Advisor Button */}
+                <div className="pt-1.5 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={(e) => handleAskAboutDisruption(e, d)}
+                    className="flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-cyan-300 border border-blue-200 dark:border-blue-800/40 text-[10px] font-semibold transition"
+                    title="Inquire about official directives with Gemini AI Assistant"
+                  >
+                    <Sparkles className="w-3 h-3 text-cyan-400" />
+                    <span>Ask Gemini About This Hazard</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 pt-1.5 border-t border-slate-200 dark:border-slate-800">
                   <span>Radius: {d.risk_radius_meters}m</span>
                   <span>
                     GPS: {d.latitude.toFixed(2)}, {d.longitude.toFixed(2)}

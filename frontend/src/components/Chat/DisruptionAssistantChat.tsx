@@ -53,6 +53,21 @@ export default function DisruptionAssistantChat({
     }
   }, [isOpen]);
 
+  // Listen for quick inquiries from Disruption Cards
+  useEffect(() => {
+    const handleAskEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ query: string }>;
+      if (customEvent.detail?.query) {
+        setIsOpen(true);
+        setTimeout(() => {
+          handleSendMessage(customEvent.detail.query);
+        }, 100);
+      }
+    };
+    window.addEventListener('ask-disruption-assistant', handleAskEvent);
+    return () => window.removeEventListener('ask-disruption-assistant', handleAskEvent);
+  }, []);
+
   const handleSendMessage = async (textToSend?: string) => {
     const text = (textToSend || query).trim();
     if (!text || isLoading) return;
