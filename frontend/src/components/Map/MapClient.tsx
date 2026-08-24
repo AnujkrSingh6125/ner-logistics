@@ -21,6 +21,7 @@ import {
 } from '@/types';
 import { BASELINE_SUPPLY_HUBS, BASELINE_DISRUPTIONS } from '@/lib/supabaseClient';
 import { useTheme } from '@/context/ThemeContext';
+import { useGps } from '@/context/LocationContext';
 import {
   Building2,
   AlertTriangle,
@@ -314,11 +315,10 @@ function MapController({
   useEffect(() => {
     try {
       if (
-        isNavigating &&
-        followMode &&
         userLocation &&
         !isNaN(userLocation[0]) &&
-        !isNaN(userLocation[1])
+        !isNaN(userLocation[1]) &&
+        (isNavigating || followMode)
       ) {
         map.panTo([userLocation[0], userLocation[1]], { animate: true, duration: 0.8 });
         return;
@@ -441,6 +441,7 @@ export default function MapClient({
   onToggleSimulation,
 }: MapClientProps) {
   const { theme } = useTheme();
+  const gps = useGps();
   const isDark = theme !== 'light';
 
   // Tile layer URL: CartoDB Dark Matter for Dark Mode, CartoDB Positron for Light Mode
@@ -845,6 +846,26 @@ export default function MapClient({
             }`
       }`}
     >
+      {/* GPS Inactive / Permission Prompt Banner */}
+      {(!isGpsEnabled || !userLocation || gps.hasUserGrantedPermission !== 'granted') && (
+        <div className="absolute top-4 left-16 z-[999] bg-slate-900/90 dark:bg-slate-900/95 border border-cyan-500/40 text-slate-100 px-3.5 py-1.5 rounded-2xl shadow-2xl backdrop-blur-xl flex items-center gap-2.5">
+          <LocateFixed className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+          <span className="text-[11px] font-medium text-slate-200 hidden sm:inline">
+            {gps.hasUserGrantedPermission === 'denied'
+              ? 'Browser GPS permission blocked'
+              : 'Live GPS is inactive'}
+          </span>
+          <button
+            type="button"
+            onClick={() => gps.enableGps()}
+            className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-2.5 py-1 rounded-xl text-xs font-bold font-mono transition flex items-center gap-1 shadow-sm"
+          >
+            <LocateFixed className="w-3 h-3" />
+            <span>Enable Device GPS</span>
+          </button>
+        </div>
+      )}
+
       {/* Hazard Simulation Floating Tactical Pill */}
       {isSimulatingHazard && (
         <div className="absolute top-4 right-16 z-[9999] bg-purple-950/90 border border-purple-400/60 text-purple-200 px-3.5 py-1.5 rounded-full shadow-2xl backdrop-blur-md flex items-center gap-1.5 text-xs font-mono font-bold animate-pulse pointer-events-none select-none">

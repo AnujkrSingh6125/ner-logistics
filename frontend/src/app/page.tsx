@@ -374,16 +374,17 @@ export default function DashboardPage() {
       }
     } else {
       gps.enableGps();
-      const lat = gps.userCoordinates ? gps.userCoordinates[0] : 26.1445;
-      const lng = gps.userCoordinates ? gps.userCoordinates[1] : 91.7362;
-      setOriginHub({
-        id: 'current-location',
-        name: 'My Current Location (Live GPS)',
-        state: 'Live GPS',
-        latitude: lat,
-        longitude: lng,
-        capacity_tonnes: 0,
-      });
+      if (gps.userCoordinates) {
+        const [lat, lng] = gps.userCoordinates;
+        setOriginHub({
+          id: 'current-location',
+          name: `My Live GPS (${lat.toFixed(4)}°, ${lng.toFixed(4)}°)`,
+          state: 'Live GPS',
+          latitude: lat,
+          longitude: lng,
+          capacity_tonnes: 0,
+        });
+      }
     }
   }, [gps, originHub]);
 
@@ -392,17 +393,42 @@ export default function DashboardPage() {
     if (!gps.isGpsEnabled) {
       gps.enableGps();
     }
-    const lat = gps.userCoordinates ? gps.userCoordinates[0] : 26.1445;
-    const lng = gps.userCoordinates ? gps.userCoordinates[1] : 91.7362;
-    setOriginHub({
-      id: 'current-location',
-      name: 'My Current Location (Live GPS)',
-      state: 'Live GPS',
-      latitude: lat,
-      longitude: lng,
-      capacity_tonnes: 0,
-    });
+    if (gps.userCoordinates) {
+      const [lat, lng] = gps.userCoordinates;
+      setOriginHub({
+        id: 'current-location',
+        name: `My Live GPS (${lat.toFixed(4)}°, ${lng.toFixed(4)}°)`,
+        state: 'Live GPS',
+        latitude: lat,
+        longitude: lng,
+        capacity_tonnes: 0,
+      });
+    } else {
+      setOriginHub({
+        id: 'current-location',
+        name: 'My Live GPS (Acquiring satellite fix...)',
+        state: 'Live GPS',
+        latitude: 0,
+        longitude: 0,
+        capacity_tonnes: 0,
+      });
+    }
   }, [gps]);
+
+  // Dynamically update Origin Strategic Hub with resolved real GPS coordinates
+  useEffect(() => {
+    if (gps.userCoordinates && (originHub?.id === 'current-location' || (!originHub && gps.isGpsEnabled))) {
+      const [lat, lng] = gps.userCoordinates;
+      setOriginHub({
+        id: 'current-location',
+        name: `My Live GPS (${lat.toFixed(4)}°, ${lng.toFixed(4)}°)`,
+        state: 'Live GPS',
+        latitude: lat,
+        longitude: lng,
+        capacity_tonnes: 0,
+      });
+    }
+  }, [gps.userCoordinates, originHub?.id, gps.isGpsEnabled]);
 
   // Real-Time Off-Route Deviation & Forward Threat Detection while En Route
   useEffect(() => {
