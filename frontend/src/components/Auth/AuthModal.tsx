@@ -207,9 +207,14 @@ export default function AuthModal() {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
+    const code = (emailOtpInput.trim() || otpDigits.join('').trim()).replace(/\D/g, '');
+    if (code.length < 6) {
+      setErrorMsg('Please enter all 6 digits of the verification code.');
+      return;
+    }
     setIsLoading(true);
     try {
-      const res = await verifyEmailOTP(emailOtpInput);
+      const res = await verifyEmailOTP(code);
       if (!res.success) {
         setErrorMsg(res.message);
       }
