@@ -257,8 +257,17 @@ export default function DashboardPage() {
       });
       const data = await res.json();
 
+      if (!res.ok || data.error) {
+        console.error('Supabase Disruption Insert Error:', data.error);
+        alert(`Failed to save hazard to database: ${data.error || 'Server error'}`);
+        return;
+      }
+
       if (data.success && data.disruption) {
-        const updatedList = [data.disruption, ...disruptions];
+        const updatedList = [
+          data.disruption,
+          ...disruptions.filter((d) => d.id !== data.disruption.id),
+        ];
         setDisruptions(updatedList);
 
         // Immediate Auto-Reroute: If a route is active, re-evaluate collisions live
@@ -274,11 +283,10 @@ export default function DashboardPage() {
             setActiveRouteView('BOTH');
           }
         }
-      } else if (data.error) {
-        alert(data.error);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error injecting simulated disruption:', err);
+      alert(`Network error saving hazard to database: ${err.message}`);
     }
   };
 

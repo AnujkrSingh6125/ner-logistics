@@ -147,6 +147,7 @@ class MultiRouteAnalysisResponse(BaseModel):
 class DisruptionChatRequest(BaseModel):
     query: str = Field(..., example="Is NH-29 safe to travel right now?", description="Natural language question about road conditions")
     disruptions: Optional[List[Dict[str, Any]]] = Field(None, description="Optional override list of active disruptions from client")
+    broadcasts: Optional[List[Dict[str, Any]]] = Field(None, description="Optional override list of active emergency broadcasts from client")
     session_id: Optional[str] = Field(None, description="Client session identifier")
 
 
@@ -390,6 +391,7 @@ async def chat_disruptions_endpoint(request: DisruptionChatRequest):
         res = chat_road_disruptions(
             query=request.query,
             disruptions=request.disruptions,
+            broadcasts=request.broadcasts,
         )
         return DisruptionChatResponse(
             status="success",

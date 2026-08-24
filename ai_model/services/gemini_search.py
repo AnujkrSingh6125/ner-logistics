@@ -509,9 +509,13 @@ def _fallback_bounded_chat(query: str, disruptions: List[Dict[str, Any]]) -> Dic
     }
 
 
-def chat_road_disruptions(query: str, disruptions: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+def chat_road_disruptions(
+    query: str,
+    disruptions: Optional[List[Dict[str, Any]]] = None,
+    broadcasts: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
     """
-    Context-Bounded Gemini Road Disruption Assistant.
+    Context-Bounded Gemini Road Disruption & Broadcast Assistant.
     STRICT DATA BOUNDING RULE: Evaluates user query SOLELY against active database records.
     If a road/corridor has no record in the database, explicitly returns:
     'No active government-reported disruptions are recorded for this corridor.'
@@ -536,24 +540,29 @@ def chat_road_disruptions(query: str, disruptions: Optional[List[Dict[str, Any]]
             "government_body_name": d.get("government_body_name") or d.get("reported_by_agency", "Emergency Authority"),
         })
 
+    cleaned_broadcasts = broadcasts or []
+
     client = _get_gemini_client()
     if not client:
         return _fallback_bounded_chat(query, cleaned_disruptions)
 
     prompt = f"""You are the Northeast Logistics Emergency Assistant.
-STRICT DATA BOUNDING RULE: You must answer the user's questions SOLELY and EXCLUSIVELY using the provided Road Disruptions Table Data below.
-If the disruption, route, or road condition is not listed in the table, explicitly state: "No active government-reported disruptions are recorded for this corridor."
+STRICT DATA BOUNDING RULE: You must answer the user's questions SOLELY and EXCLUSIVELY using the provided official Government Tables below.
+If the disruption, route, or road condition is not listed in the tables, explicitly state: "No active government-reported disruptions are recorded for this corridor."
 DO NOT extrapolate, guess, or use external knowledge or general web data.
 
 Active Road Disruptions Database:
 {json.dumps(cleaned_disruptions, indent=2)}
 
+Active Emergency System Broadcasts Database:
+{json.dumps(cleaned_broadcasts, indent=2)}
+
 User Question: "{query}"
 
 Instructions:
 1. Provide a professional, concise operational answer.
-2. Whenever you cite an active disruption, ALWAYS cite the reporting agency/government body (e.g. `[Reported by: BRO Project Vartak]`, `[Reported by: Assam SDMA]`).
-3. If an official government directive `message` is recorded for the hazard, quote the directive in quotation marks so the user has the official statement.
+2. Whenever you cite an active disruption or broadcast, ALWAYS cite the reporting agency/government body (e.g. `[Reported by: BRO Project Vartak]`, `[Reported by: Assam SDMA]`).
+3. If an official government directive `message` is recorded for the hazard or broadcast, quote the directive in quotation marks so the user has the exact official statement.
 4. If the user asks about a route/highway/corridor NOT in the database, output ONLY: "No active government-reported disruptions are recorded for this corridor."
 """
 

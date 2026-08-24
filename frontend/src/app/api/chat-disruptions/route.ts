@@ -19,18 +19,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. Fetch current active disruptions from Supabase as strict ground truth
+    // 1. Fetch current active disruptions & broadcasts from Supabase as strict ground truth
     let disruptions: any[] = [];
+    let broadcasts: any[] = [];
+
     if (supabase) {
       try {
-        const { data, error } = await supabase
-          .from('road_disruptions')
-          .select('*')
-          .eq('is_active', true)
-          .order('created_at', { ascending: false });
+        const [disruptRes, broadRes] = await Promise.all([
+          supabase
+            .from('road_disruptions')
+            .select('*')
+            .eq('is_active', true)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('system_broadcasts')
+            .select('*')
+            .eq('is_active', true)
+            .order('created_at', { ascending: false }),
+        ]);
 
-        if (!error && data && data.length > 0) {
-          disruptions = data;
+        if (!disruptRes.error && disruptRes.data && disruptRes.data.length > 0) {
+          disruptions = disruptRes.data;
+        }
+        if (!broadRes.error && broadRes.data && broadRes.data.length > 0) {
+          broadcasts = broadRes.data;
         }
       } catch (err) {
         console.warn('[CHAT-DISRUPTIONS] Supabase fetch error, using local fallback:', err);
@@ -72,6 +84,15 @@ export async function POST(request: NextRequest) {
             description: d.description || d.message,
             government_body_name:
               d.government_body_name || d.reported_by_agency || 'Emergency Management Authority',
+          })),
+          broadcasts: broadcasts.map((b) => ({
+            id: b.id,
+            title: b.title,
+            agency: b.agency,
+            severity: b.severity,
+            message: b.message,
+            affected_region: b.affected_region,
+            issued_by_name: b.issued_by_name,
           })),
         }),
         signal: controller.signal,
