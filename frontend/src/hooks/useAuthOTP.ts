@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase, sendUserOtp, verifyUserOtp } from '@/lib/supabaseClient';
+
+export { sendUserOtp, verifyUserOtp };
 
 export interface UseAuthOTPResult {
   step: 'DETAILS' | 'OTP';
@@ -21,7 +23,7 @@ export function useAuthOTP(): UseAuthOTPResult {
   const [email, setEmail] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Step 1: Dispatch 6-Digit Code via signInWithOtp
+  // Step 1: Dispatch 6-Digit Code via sendUserOtp / signInWithOtp
   const sendOTP = async (targetEmail: string, metadata: Record<string, any> = {}) => {
     setLoading(true);
     setErrorMsg(null);
@@ -39,26 +41,14 @@ export function useAuthOTP(): UseAuthOTPResult {
       // 1. Primary: Supabase Native Passwordless OTP with emailRedirectTo: undefined
       if (supabase) {
         try {
-          const { data, error } = await supabase.auth.signInWithOtp({
-            email: cleanEmail,
-            options: {
-              shouldCreateUser: true,
-              data: metadata, // full_name, role, hub_id, phone, etc.
-              emailRedirectTo: undefined, // Crucial: forces token mode, prevents URL link dispatch
-            },
-          });
-
-          if (error) {
-            console.warn('[useAuthOTP] Supabase signInWithOtp notice:', error.message);
-          } else {
-            supaSuccess = true;
-          }
+          await sendUserOtp(cleanEmail, metadata);
+          supaSuccess = true;
         } catch (supaErr: any) {
-          console.warn('[useAuthOTP] Supabase exception:', supaErr.message);
+          console.warn('[useAuthOTP] Supabase sendUserOtp notice:', supaErr.message);
         }
       }
 
-      // 2. Secondary: Transactional Brevo Backend Pipeline & Cache Fallback
+      // 2. Secondary: Transactional Backend Pipeline & Cache Fallback
       try {
         const res = await fetch('/api/auth/send-otp', {
           method: 'POST',
@@ -90,7 +80,7 @@ export function useAuthOTP(): UseAuthOTPResult {
     }
   };
 
-  // Step 2: Verify 6-Digit Code via verifyOtp
+  // Step 2: Verify 6-Digit Code via verifyUserOtp / verifyOtp
   const verifyOTP = async (token: string) => {
     setLoading(true);
     setErrorMsg(null);
@@ -104,24 +94,16 @@ export function useAuthOTP(): UseAuthOTPResult {
     }
 
     try {
-      // 1. Primary: Native Supabase verifyOtp
+      // 1. Primary: Native Supabase verifyUserOtp
       if (supabase) {
         try {
-          const { data, error } = await supabase.auth.verifyOtp({
-            email,
-            token: cleanToken,
-            type: 'email',
-          });
-
-          if (!error && data?.user) {
+          const data = await verifyUserOtp(email, cleanToken);
+          if (data?.user) {
             setLoading(false);
             return { success: true, session: data.session, user: data.user };
           }
-          if (error) {
-            console.warn('[useAuthOTP] Supabase verifyOtp notice:', error.message);
-          }
         } catch (supaErr: any) {
-          console.warn('[useAuthOTP] Supabase verify exception:', supaErr.message);
+          console.warn('[useAuthOTP] Supabase verifyUserOtp notice:', supaErr.message);
         }
       }
 

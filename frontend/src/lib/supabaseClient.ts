@@ -1046,6 +1046,56 @@ export async function updateShipmentTelemetry(
 }
 
 // ============================================================================
+// Supabase Passwordless 6-Digit Email OTP Authentication Handlers
+// ============================================================================
+
+// Step 1: Send 6-Digit OTP
+export async function sendUserOtp(email: string, userMetadata: Record<string, any> = {}) {
+  const cleanEmail = email.trim().toLowerCase();
+
+  if (!supabase) {
+    throw new Error('Supabase client is not initialized.');
+  }
+
+  const { data, error } = await supabase.auth.signInWithOtp({
+    email: cleanEmail,
+    options: {
+      shouldCreateUser: true,
+      data: userMetadata, // Pass role, full_name, hub_id, phone, etc.
+      emailRedirectTo: undefined, // Disables confirmation URL mode
+    },
+  });
+
+  if (error) {
+    console.error('OTP Send Error:', error.message);
+    throw error;
+  }
+  return data;
+}
+
+// Step 2: Verify 6-Digit Token
+export async function verifyUserOtp(email: string, token: string) {
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanToken = token.trim();
+
+  if (!supabase) {
+    throw new Error('Supabase client is not initialized.');
+  }
+
+  const { data, error } = await supabase.auth.verifyOtp({
+    email: cleanEmail,
+    token: cleanToken,
+    type: 'email',
+  });
+
+  if (error) {
+    console.error('OTP Verification Error:', error.message);
+    throw error;
+  }
+  return data; // contains session and user
+}
+
+// ============================================================================
 // Realtime Universal Cross-Session & Cross-Tab Synchronization Engine
 // ============================================================================
 export type RealtimeSyncEvent =

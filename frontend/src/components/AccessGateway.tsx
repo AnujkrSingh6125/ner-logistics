@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useAuthOTP } from '@/hooks/useAuthOTP';
+import { useAuthOTP, sendUserOtp, verifyUserOtp } from '@/hooks/useAuthOTP';
 import { useAuth } from '@/context/AuthContext';
+
+export { sendUserOtp, verifyUserOtp };
 import {
   Shield,
   KeyRound,
