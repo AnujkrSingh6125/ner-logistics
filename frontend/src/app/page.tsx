@@ -33,7 +33,7 @@ import {
 } from '@/types';
 import { calculateRoute } from '@/lib/api';
 import { recommendAlternateHubs } from '@/lib/spatial';
-import { useUserLocationManager } from '@/hooks/useUserLocationManager';
+import { useGps } from '@/context/LocationContext';
 import { ThreatAlertData } from '@/components/Navigation/LiveNavigationHUD';
 import * as turf from '@turf/turf';
 import {
@@ -49,7 +49,7 @@ import {
 
 export default function DashboardPage() {
   const { user, isGovOfficial, openAuthModal } = useAuth();
-  const gps = useUserLocationManager();
+  const gps = useGps();
 
   // Pre-seed state with baseline data for instant hydration & 100% offline resilience
   const [hubs, setHubs] = useState<SupplyHub[]>(BASELINE_SUPPLY_HUBS);
@@ -368,12 +368,12 @@ export default function DashboardPage() {
   // Dynamic GPS Privacy Toggle Handler
   const handleToggleGps = useCallback(() => {
     if (gps.isGpsEnabled) {
-      gps.disableGpsTracking();
+      gps.disableGps();
       if (originHub?.id === 'current-location') {
         setOriginHub(BASELINE_SUPPLY_HUBS[0]);
       }
     } else {
-      gps.enableGpsTracking();
+      gps.enableGps();
       const lat = gps.userCoordinates ? gps.userCoordinates[0] : 26.1445;
       const lng = gps.userCoordinates ? gps.userCoordinates[1] : 91.7362;
       setOriginHub({
@@ -390,7 +390,7 @@ export default function DashboardPage() {
   // Use Current Location Handler
   const handleUseCurrentLocation = useCallback(() => {
     if (!gps.isGpsEnabled) {
-      gps.enableGpsTracking();
+      gps.enableGps();
     }
     const lat = gps.userCoordinates ? gps.userCoordinates[0] : 26.1445;
     const lng = gps.userCoordinates ? gps.userCoordinates[1] : 91.7362;
@@ -516,7 +516,7 @@ export default function DashboardPage() {
   // Toggle Convoy Motion Simulator
   const handleToggleSimulation = () => {
     if (gps.isSimulated) {
-      gps.disableGpsTracking();
+      gps.disableGps();
     } else {
       const activeCoords =
         routeData?.candidateRoutes?.[selectedRouteIndex]?.geometry?.coordinates ||

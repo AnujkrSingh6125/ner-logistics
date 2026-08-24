@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useGps } from '@/context/LocationContext';
 import {
   User,
   Shield,
@@ -32,6 +33,14 @@ export default function UserProfileDropdown() {
     toggleLocationSharing,
   } = useAuth();
   const { theme, toggleTheme } = useTheme();
+
+  const {
+    isTelemetryEnabled,
+    isGpsHardwareActive,
+    statusText,
+    badgeColor,
+    toggleGps,
+  } = useGps();
 
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -161,20 +170,32 @@ export default function UserProfileDropdown() {
               {isPublicUser && (
                 <button
                   type="button"
-                  onClick={toggleLocationSharing}
-                  className={`flex items-center gap-1 text-[11px] font-mono font-medium px-2 py-0.5 rounded-md border transition ${
-                    isSharingLoc
-                      ? 'bg-emerald-950/60 border-emerald-700 text-emerald-300'
-                      : 'bg-slate-900 border-slate-700 text-slate-400'
+                  onClick={toggleGps}
+                  className={`flex items-center gap-1.5 text-[11px] font-mono font-bold px-2 py-0.5 rounded-md border transition shadow-sm ${
+                    badgeColor === 'emerald'
+                      ? 'bg-emerald-950/70 border-emerald-500/80 text-emerald-300 hover:bg-emerald-900/80'
+                      : badgeColor === 'amber'
+                      ? 'bg-amber-950/70 border-amber-500/80 text-amber-300 hover:bg-amber-900/80'
+                      : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800'
                   }`}
-                  title="Click to toggle GPS location telemetry sharing"
+                  title="Toggle GPS Live Telemetry Sharing (Synchronized with Top Bar)"
                 >
                   <Radio
-                    className={`w-3 h-3 text-emerald-400 ${
-                      isSharingLoc ? 'animate-pulse' : 'opacity-40'
+                    className={`w-3.5 h-3.5 ${
+                      badgeColor === 'emerald'
+                        ? 'text-emerald-400 animate-pulse'
+                        : badgeColor === 'amber'
+                        ? 'text-amber-400'
+                        : 'text-slate-400 opacity-50'
                     }`}
                   />
-                  <span>{isSharingLoc ? 'GPS Live' : 'GPS Idle'}</span>
+                  <span>
+                    {statusText === 'LIVE CONNECTED'
+                      ? 'GPS Live'
+                      : statusText === 'GPS MUTED'
+                      ? 'GPS Muted'
+                      : 'GPS Idle'}
+                  </span>
                 </button>
               )}
             </div>
