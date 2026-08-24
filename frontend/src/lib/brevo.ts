@@ -156,6 +156,12 @@ export async function sendBrevoEmailREST(
         to: [{ email, name: fullName }],
         subject: `Your Verification Code: ${otp} - NER Smart Logistics`,
         htmlContent: getOTPEmailHtml(fullName, otp),
+        textContent: `Hello ${fullName || 'Citizen / Driver'},\n\nYour 6-digit email verification code is: ${otp}\n\nEnter this code on the NER Smart Logistics platform to activate your account.\nThis code will expire in 10 minutes.\n\n---\nNER Smart Logistics Infrastructure • National Disaster Command`,
+        headers: {
+          'X-Priority': '1',
+          'X-MSMail-Priority': 'High',
+          Importance: 'High',
+        },
       }),
     });
 
