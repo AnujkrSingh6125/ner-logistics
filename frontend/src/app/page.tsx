@@ -33,6 +33,9 @@ import {
 } from '@/types';
 import { calculateRoute } from '@/lib/api';
 import { recommendAlternateHubs } from '@/lib/spatial';
+import { useLiveTracking } from '@/hooks/useLiveTracking';
+import { ThreatAlertData } from '@/components/Navigation/LiveNavigationHUD';
+import * as turf from '@turf/turf';
 import {
   Layers,
   Eye,
@@ -41,10 +44,12 @@ import {
   CircleDot,
   Sparkles,
   Building2,
+  Navigation,
 } from 'lucide-react';
 
 export default function DashboardPage() {
   const { user, isGovOfficial, openAuthModal } = useAuth();
+  const tracking = useLiveTracking();
 
   // Pre-seed state with baseline data for instant hydration & 100% offline resilience
   const [hubs, setHubs] = useState<SupplyHub[]>(BASELINE_SUPPLY_HUBS);
@@ -66,6 +71,9 @@ export default function DashboardPage() {
   const [activeRouteView, setActiveRouteView] = useState<
     'PRIMARY' | 'DETOUR' | 'BOTH'
   >('BOTH');
+
+  // Realtime Threat Interception Alert Data
+  const [threatAlert, setThreatAlert] = useState<ThreatAlertData | null>(null);
 
   // Simulation State (Restricted to Government Officials)
   const [isSimulatingHazard, setIsSimulatingHazard] = useState<boolean>(false);
@@ -357,6 +365,170 @@ export default function DashboardPage() {
     });
   };
 
+  // Use Current Location Handler
+  const handleUseCurrentLocation = useCallback(() => {
+    tracking.startTracking();
+    const lat = tracking.userLocation ? tracking.userLocation[0] : 26.1445;
+    const lng = tracking.userLocation ? tracking.userLocation[1] : 91.7362;
+    setOriginHub({
+      id: 'current-location',
+      name: 'My Current Location (Live GPS)',
+      state: 'Live GPS',
+      latitude: lat,
+      longitude: lng,
+      capacity_tonnes: 0,
+    });
+  }, [tracking]);
+
+  // Real-Time Off-Route Deviation & Forward Threat Detection while En Route
+  useEffect(() => {
+    if (!tracking.userLocation) return;
+    const [userLat, userLng] = tracking.userLocation;
+
+    // 1. Off-Route Deviation Recalculation (> 120m from active path)
+    if (tracking.isNavigating && destHub && routeData) {
+      const activeCoords =
+        routeData.candidateRoutes?.[selectedRouteIndex]?.geometry?.coordinates ||
+        routeData.primaryRoute?.geometry?.coordinates;
+
+      if (activeCoords && activeCoords.length >= 2) {
+        try {
+          const routeLine = turf.lineString(activeCoords);
+          const userPt = turf.point([userLng, userLat]);
+          const deviationMeters = turf.pointToLineDistance(userPt, routeLine, {
+            units: 'meters',
+          });
+
+          if (deviationMeters > 120) {
+            console.log(
+              `[DYNAMIC REROUTE] Vehicle deviated by ${Math.round(
+                deviationMeters
+              )}m from planned corridor. Recalculating route...`
+            );
+            calculateRoute(
+              userLat,
+              userLng,
+              destHub.latitude,
+              destHub.longitude,
+              'driving',
+              originHub?.name || 'Live GPS Position',
+              destHub.name,
+              cargoTier
+            )
+              .then((recalc) => {
+                setRouteData(recalc);
+              })
+              .catch((err) => console.warn('Dynamic reroute error:', err));
+          }
+        } catch (err) {
+          // Safe ignore
+        }
+      }
+    }
+
+    // 2. Real-Time Forward Hazard Interception
+    if (tracking.isNavigating && disruptions.length > 0) {
+      let closestThreat: ThreatAlertData | null = null;
+      const userPt = turf.point([userLng, userLat]);
+
+      for (const d of disruptions) {
+        if (!d.is_active) continue;
+        const hazardPt = turf.point([d.longitude, d.latitude]);
+        const distKm = turf.distance(userPt, hazardPt, { units: 'kilometers' });
+        const riskRadiusKm = (d.risk_radius_meters || 1500) / 1000.0;
+
+        // Check if hazard is within 10km forward
+        if (distKm <= riskRadiusKm + 10.0) {
+          if (!closestThreat || distKm < closestThreat.distanceAheadKm) {
+            closestThreat = {
+              disruption: d,
+              distanceAheadKm: distKm,
+              isDirectBlockage: distKm <= riskRadiusKm,
+            };
+          }
+        }
+      }
+
+      setThreatAlert(closestThreat);
+    }
+  }, [
+    tracking.userLocation,
+    tracking.isNavigating,
+    destHub,
+    originHub,
+    routeData,
+    selectedRouteIndex,
+    cargoTier,
+    disruptions,
+  ]);
+
+  // Start Navigation Handler
+  const handleStartNavigation = async () => {
+    if (!destHub) {
+      alert('Please select a destination hub first.');
+      return;
+    }
+
+    if (!routeData && originHub) {
+      const startLat = tracking.userLocation ? tracking.userLocation[0] : originHub.latitude;
+      const startLng = tracking.userLocation ? tracking.userLocation[1] : originHub.longitude;
+      const fresh = await calculateRoute(
+        startLat,
+        startLng,
+        destHub.latitude,
+        destHub.longitude,
+        'driving',
+        originHub.name,
+        destHub.name,
+        cargoTier
+      );
+      setRouteData(fresh);
+    }
+
+    tracking.startNavigation();
+  };
+
+  // Toggle Convoy Motion Simulator
+  const handleToggleSimulation = () => {
+    if (tracking.isSimulated) {
+      tracking.stopTracking();
+    } else {
+      const activeCoords =
+        routeData?.candidateRoutes?.[selectedRouteIndex]?.geometry?.coordinates ||
+        routeData?.primaryRoute?.geometry?.coordinates;
+
+      if (activeCoords && activeCoords.length >= 2) {
+        tracking.startSimulation(activeCoords as [number, number][], 65);
+      } else {
+        alert('Please calculate a corridor route before launching simulated vehicle motion.');
+      }
+    }
+  };
+
+  // Accept Detour Around Threat
+  const handleAcceptDetour = async () => {
+    if (routeData?.alternativeRoute) {
+      setActiveRouteView('DETOUR');
+      setThreatAlert(null);
+    } else if (originHub && destHub) {
+      const startLat = tracking.userLocation ? tracking.userLocation[0] : originHub.latitude;
+      const startLng = tracking.userLocation ? tracking.userLocation[1] : originHub.longitude;
+      const fresh = await calculateRoute(
+        startLat,
+        startLng,
+        destHub.latitude,
+        destHub.longitude,
+        'driving',
+        originHub.name,
+        destHub.name,
+        cargoTier
+      );
+      setRouteData(fresh);
+      setActiveRouteView('DETOUR');
+      setThreatAlert(null);
+    }
+  };
+
   return (
     <div className="min-h-screen lg:h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200 lg:overflow-hidden">
       <div className="shrink-0">
@@ -386,19 +558,27 @@ export default function DashboardPage() {
           />
         </div>
 
-        {/* Main Content Grid: Map & Controls */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 flex-1 min-h-0 lg:overflow-hidden">
-          {/* Left Column: Interactive Leaflet Map (8 cols) - Fixed & fills height */}
-          <div className="lg:col-span-8 flex flex-col space-y-2 h-[480px] lg:h-full min-h-0">
-            {/* Map Top Bar with Layer Controls */}
-            <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 bg-white dark:bg-[#1c2541]/80 backdrop-blur px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs shadow-sm dark:shadow-md transition-colors duration-200">
-              <div className="flex items-center gap-2 text-slate-800 dark:text-slate-300 font-semibold">
+        {/* Tactical 2-Column Responsive Layout */}
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3 pb-1">
+          {/* Left Column: Tactical Geospatial Map (8 cols) */}
+          <div className="lg:col-span-8 flex flex-col h-full min-h-0 space-y-2">
+            {/* Map Layer Toolbar */}
+            <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-white dark:bg-[#1c2541]/90 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur transition-colors duration-200">
+              <div className="flex items-center gap-2">
                 <Layers className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-                <span>Northeast Spatial Intelligence Corridor Layer</span>
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  GIS Layer Controls
+                </span>
                 {isSimulatingHazard && isGovOfficial && (
-                  <span className="text-[10px] bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200 border border-red-300 dark:border-red-600 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                  <span className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-700/80 px-2 py-0.5 rounded-full font-mono flex items-center gap-1 font-semibold">
                     <Sparkles className="w-2.5 h-2.5 text-amber-500 dark:text-amber-300" />
                     Hazard Simulation Active
+                  </span>
+                )}
+                {tracking.isNavigating && (
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 px-2 py-0.5 rounded-full font-mono flex items-center gap-1 font-bold animate-pulse">
+                    <Navigation className="w-2.5 h-2.5" />
+                    GPS Navigation Active
                   </span>
                 )}
               </div>
@@ -448,7 +628,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Map Display Container */}
-            <div className="flex-1 w-full min-h-0 h-full rounded-2xl overflow-hidden shadow-sm dark:shadow-md border border-slate-200 dark:border-slate-800">
+            <div className="flex-1 w-full min-h-0 h-full rounded-2xl overflow-hidden shadow-sm dark:shadow-md border border-slate-200 dark:border-slate-800 relative">
               <LogisticsMap
                 hubs={hubs}
                 disruptions={disruptions}
@@ -462,11 +642,25 @@ export default function DashboardPage() {
                 showDisruptions={showDisruptions}
                 showBuffers={showBuffers}
                 isSimulatingHazard={isSimulatingHazard && isGovOfficial}
+                userLocation={tracking.userLocation}
+                accuracy={tracking.accuracy}
+                heading={tracking.heading}
+                speed={tracking.speed}
+                isTracking={tracking.isTracking}
+                isNavigating={tracking.isNavigating}
+                followMode={tracking.followMode}
+                isSimulated={tracking.isSimulated}
+                threatAlert={threatAlert}
                 onSelectHub={(hub) => setSelectedHub(hub)}
                 onSetOrigin={(hub) => setOriginHub(hub)}
                 onSetDestination={(hub) => setDestHub(hub)}
                 onSelectCandidateRoute={handleSelectCandidateRoute}
                 onMapClickSimulate={handleMapClickSimulate}
+                onToggleFollowMode={tracking.toggleFollowMode}
+                onExitNavigation={tracking.stopNavigation}
+                onAcceptDetour={handleAcceptDetour}
+                onDismissThreatAlert={() => setThreatAlert(null)}
+                onToggleSimulation={handleToggleSimulation}
               />
             </div>
           </div>
@@ -491,6 +685,9 @@ export default function DashboardPage() {
               activeRouteView={activeRouteView}
               cargoTier={cargoTier}
               selectedRouteIndex={selectedRouteIndex}
+              userLocation={tracking.userLocation}
+              isTracking={tracking.isTracking}
+              isNavigating={tracking.isNavigating}
               onSetOrigin={setOriginHub}
               onSetDestination={setDestHub}
               onSetCargoTier={setCargoTier}
@@ -506,6 +703,9 @@ export default function DashboardPage() {
                 setShowAlternateHubs(!showAlternateHubs)
               }
               onClear={handleClear}
+              onUseCurrentLocation={handleUseCurrentLocation}
+              onStartNavigation={handleStartNavigation}
+              onStopNavigation={tracking.stopNavigation}
             />
 
             <DisruptionAlerts

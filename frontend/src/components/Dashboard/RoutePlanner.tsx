@@ -32,6 +32,7 @@ import {
   Radio,
   Globe,
   FileText,
+  LocateFixed,
 } from 'lucide-react';
 
 interface RoutePlannerProps {
@@ -42,6 +43,10 @@ interface RoutePlannerProps {
   activeRouteView: 'PRIMARY' | 'DETOUR' | 'BOTH';
   cargoTier: CargoTier;
   selectedRouteIndex?: number;
+  // Live GPS Navigation Props
+  userLocation?: [number, number] | null;
+  isTracking?: boolean;
+  isNavigating?: boolean;
   onSetOrigin: (hub: SupplyHub | null) => void;
   onSetDestination: (hub: SupplyHub | null) => void;
   onSetCargoTier: (tier: CargoTier) => void;
@@ -50,6 +55,9 @@ interface RoutePlannerProps {
   onSelectCandidateRoute?: (index: number) => void;
   onToggleAlternateHubs?: () => void;
   onClear?: () => void;
+  onUseCurrentLocation?: () => void;
+  onStartNavigation?: () => void;
+  onStopNavigation?: () => void;
 }
 
 export default function RoutePlanner({
@@ -60,6 +68,9 @@ export default function RoutePlanner({
   activeRouteView,
   cargoTier,
   selectedRouteIndex,
+  userLocation,
+  isTracking,
+  isNavigating,
   onSetOrigin,
   onSetDestination,
   onSetCargoTier,
@@ -68,6 +79,9 @@ export default function RoutePlanner({
   onSelectCandidateRoute,
   onToggleAlternateHubs,
   onClear,
+  onUseCurrentLocation,
+  onStartNavigation,
+  onStopNavigation,
 }: RoutePlannerProps) {
   const [loading, setLoading] = useState(false);
   const [showSteps, setShowSteps] = useState(false);
@@ -211,14 +225,37 @@ export default function RoutePlanner({
 
       {/* Select Hubs Form */}
       <div className="space-y-2.5">
-        {/* Origin Hub Selector */}
+        {/* Origin Hub Selector with Live GPS Quick-Toggle */}
         <div>
-          <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
-            Origin Strategic Hub:
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
+              Origin Strategic Hub:
+            </label>
+            {onUseCurrentLocation && (
+              <button
+                type="button"
+                onClick={onUseCurrentLocation}
+                className={`text-[10px] px-2 py-0.5 rounded flex items-center gap-1 font-semibold transition border ${
+                  originHub?.id === 'current-location' || isTracking
+                    ? 'bg-cyan-50 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-300 border-cyan-300 dark:border-cyan-700'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
+                title="Use Live GPS Coordinates as Route Origin"
+              >
+                <LocateFixed className="w-3 h-3 text-cyan-500" />
+                <span>
+                  {originHub?.id === 'current-location' ? '📍 GPS Origin Active' : 'Use Current Location'}
+                </span>
+              </button>
+            )}
+          </div>
           <select
             value={originHub?.id || ''}
             onChange={(e) => {
+              if (e.target.value === 'current-location') {
+                onUseCurrentLocation?.();
+                return;
+              }
               const selected =
                 hubs.find((h) => h.id === e.target.value) || null;
               onSetOrigin(selected);
@@ -226,6 +263,11 @@ export default function RoutePlanner({
             className="w-full bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs rounded-lg px-3 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none font-medium"
           >
             <option value="">-- Select Origin Hub --</option>
+            {userLocation && (
+              <option value="current-location">
+                📍 My Current Location (GPS: {userLocation[0].toFixed(3)}°, {userLocation[1].toFixed(3)}°)
+              </option>
+            )}
             {hubs.map((hub) => (
               <option key={`orig-${hub.id}`} value={hub.id}>
                 {hub.name} ({hub.state})
@@ -299,6 +341,26 @@ export default function RoutePlanner({
             </button>
           )}
         </div>
+
+        {/* Start Live GPS Navigation CTA */}
+        {routeData && onStartNavigation && (
+          <button
+            type="button"
+            onClick={isNavigating ? onStopNavigation : onStartNavigation}
+            className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs shadow-lg transition flex items-center justify-center gap-2 ${
+              isNavigating
+                ? 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white animate-pulse'
+                : 'bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white'
+            }`}
+          >
+            <Navigation className="w-4 h-4 stroke-[2.5]" />
+            <span>
+              {isNavigating
+                ? 'Exit Live GPS Navigation'
+                : 'Start Google Maps-Style Live GPS Navigation'}
+            </span>
+          </button>
+        )}
       </div>
 
       {/* Calculated Route Results & Hazard Analysis */}

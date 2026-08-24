@@ -40,7 +40,9 @@ import {
   Plus,
   Minus,
   RotateCcw,
+  LocateFixed,
 } from 'lucide-react';
+import LiveNavigationHUD, { ThreatAlertData } from '@/components/Navigation/LiveNavigationHUD';
 
 // Custom Interactive Zoom Controls inside MapContainer
 function CustomZoomControls() {
@@ -122,20 +124,31 @@ function MapResizer({ isFullscreen }: { isFullscreen: boolean }) {
   return null;
 }
 
-// Map Controller for Camera Center / FitBounds
+// Map Controller for Camera Center, Follow Mode & FitBounds
 function MapController({
   center,
   zoom,
   routeCoordinates,
+  userLocation,
+  isNavigating,
+  followMode,
 }: {
   center: [number, number];
   zoom: number;
   routeCoordinates?: [number, number][];
+  userLocation?: [number, number] | null;
+  isNavigating?: boolean;
+  followMode?: boolean;
 }) {
   const map = useMap();
 
   useEffect(() => {
     try {
+      if (isNavigating && followMode && userLocation && !isNaN(userLocation[0]) && !isNaN(userLocation[1])) {
+        map.panTo([userLocation[0], userLocation[1]], { animate: true, duration: 0.8 });
+        return;
+      }
+
       if (routeCoordinates && routeCoordinates.length > 1) {
         const valid = routeCoordinates.filter(
           (c) => Array.isArray(c) && c.length >= 2 && !isNaN(c[0]) && !isNaN(c[1])
@@ -156,9 +169,44 @@ function MapController({
     } catch (err) {
       console.warn('MapController camera update warning:', err);
     }
-  }, [center, zoom, routeCoordinates, map]);
+  }, [center, zoom, routeCoordinates, userLocation, isNavigating, followMode, map]);
 
   return null;
+}
+
+// Map Recenter on Me Floating Action Button (FAB)
+function MapRecenterControl({
+  userLocation,
+  onRecenter,
+}: {
+  userLocation?: [number, number] | null;
+  onRecenter?: () => void;
+}) {
+  const map = useMap();
+  if (!userLocation) return null;
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    map.setView(userLocation, 14, { animate: true });
+    if (onRecenter) onRecenter();
+  };
+
+  return (
+    <div
+      className="absolute bottom-16 right-4 z-[9999] pointer-events-auto select-none"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        onClick={handleClick}
+        className="w-8 h-8 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 shadow-md flex items-center justify-center text-cyan-600 dark:text-cyan-400 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95 transition"
+        title="Recenter Map on Me"
+      >
+        <LocateFixed className="w-4 h-4" />
+      </button>
+    </div>
+  );
 }
 
 // Map Click Handler for Hazard Simulation
@@ -196,11 +244,26 @@ interface MapClientProps {
   showHubs?: boolean;
   showBuffers?: boolean;
   isSimulatingHazard?: boolean;
+  // Live GPS Tracking Props
+  userLocation?: [number, number] | null;
+  accuracy?: number;
+  heading?: number | null;
+  speed?: number | null;
+  isTracking?: boolean;
+  isNavigating?: boolean;
+  followMode?: boolean;
+  isSimulated?: boolean;
+  threatAlert?: ThreatAlertData | null;
   onSelectHub?: (hub: SupplyHub) => void;
   onSetOrigin?: (hub: SupplyHub) => void;
   onSetDestination?: (hub: SupplyHub) => void;
   onSelectCandidateRoute?: (index: number) => void;
   onMapClickSimulate?: (coords: { latitude: number; longitude: number }) => void;
+  onToggleFollowMode?: () => void;
+  onExitNavigation?: () => void;
+  onAcceptDetour?: () => void;
+  onDismissThreatAlert?: () => void;
+  onToggleSimulation?: () => void;
 }
 
 export default function MapClient({
@@ -216,11 +279,25 @@ export default function MapClient({
   showHubs = true,
   showBuffers = true,
   isSimulatingHazard = false,
+  userLocation,
+  accuracy = 15,
+  heading,
+  speed,
+  isTracking = false,
+  isNavigating = false,
+  followMode = true,
+  isSimulated = false,
+  threatAlert,
   onSelectHub,
   onSetOrigin,
   onSetDestination,
   onSelectCandidateRoute,
   onMapClickSimulate,
+  onToggleFollowMode,
+  onExitNavigation,
+  onAcceptDetour,
+  onDismissThreatAlert,
+  onToggleSimulation,
 }: MapClientProps) {
   // Safe fallbacks to guarantee instant rendering even if API returns empty array
   const safeHubs = useMemo(() => {
@@ -367,6 +444,32 @@ export default function MapClient({
       iconSize: [28, 28],
       iconAnchor: [14, 14],
       popupAnchor: [0, -14],
+    });
+  };
+
+  // Custom DivIcon for Live GPS Vehicle / User Location
+  const createUserGpsIcon = (headingDeg: number | null) => {
+    const hasHeading = headingDeg !== null && !isNaN(headingDeg);
+    const html = `
+      <div class="relative flex items-center justify-center w-8 h-8 pointer-events-none">
+        <div class="absolute w-8 h-8 rounded-full bg-cyan-500/35 animate-ping"></div>
+        <div class="absolute w-6 h-6 rounded-full bg-cyan-400/40 animate-pulse"></div>
+        <div class="w-5 h-5 rounded-full bg-cyan-500 border-2 border-white shadow-xl flex items-center justify-center text-white" style="${
+          hasHeading ? `transform: rotate(${headingDeg}deg);` : ''
+        }">
+          ${
+            hasHeading
+              ? `<svg class="w-3 h-3 fill-current text-white" viewBox="0 0 24 24"><polygon points="12,2 22,22 12,17 2,22" /></svg>`
+              : `<div class="w-1.5 h-1.5 rounded-full bg-white"></div>`
+          }
+        </div>
+      </div>
+    `;
+    return L.divIcon({
+      html,
+      className: 'custom-live-gps-user-icon',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
     });
   };
 
@@ -653,6 +756,14 @@ export default function MapClient({
           center={mapCenter}
           zoom={selectedHub ? 9 : defaultZoom}
           routeCoordinates={combinedCoordinates}
+          userLocation={userLocation}
+          isNavigating={isNavigating}
+          followMode={followMode}
+        />
+
+        <MapRecenterControl
+          userLocation={userLocation}
+          onRecenter={onToggleFollowMode}
         />
 
         <MapSimulationClickHandler
@@ -1069,7 +1180,76 @@ export default function MapClient({
             </Popup>
           </Marker>
         ))}
+        {/* 7. Live GPS User / Commercial Convoy Marker */}
+        {userLocation && !isNaN(userLocation[0]) && !isNaN(userLocation[1]) && (
+          <>
+            <Circle
+              center={userLocation}
+              radius={accuracy || 15}
+              pathOptions={{
+                color: '#0284c7',
+                fillColor: '#38bdf8',
+                fillOpacity: 0.18,
+                weight: 1.5,
+              }}
+            />
+            <Marker
+              position={userLocation}
+              icon={createUserGpsIcon(heading ?? null)}
+              zIndexOffset={2000}
+            >
+              <Popup>
+                <div className="p-1.5 text-xs text-slate-100 min-w-[170px]">
+                  <div className="flex items-center gap-1.5 font-bold text-cyan-300 mb-1">
+                    <Navigation className="w-3.5 h-3.5" />
+                    <span>My Live Vehicle Position</span>
+                  </div>
+                  <div className="text-[11px] text-slate-300 space-y-0.5">
+                    <div>
+                      Coords: {userLocation[0].toFixed(4)}°, {userLocation[1].toFixed(4)}°
+                    </div>
+                    <div>Accuracy Radius: ±{Math.round(accuracy || 15)}m</div>
+                    {speed !== null && speed !== undefined && (
+                      <div className="text-emerald-400 font-mono font-semibold">
+                        Speed: {speed} km/h
+                      </div>
+                    )}
+                    {heading !== null && heading !== undefined && (
+                      <div className="text-slate-400">Heading: {heading}°</div>
+                    )}
+                  </div>
+                </div>
+              </Popup>
+            </Marker>
+          </>
+        )}
       </MapContainer>
+
+      {/* Live Google Maps-Style Turn-by-Turn Navigation HUD */}
+      <LiveNavigationHUD
+        isNavigating={Boolean(isNavigating)}
+        destinationName={destHub?.name || 'Destination'}
+        remainingDistanceKm={
+          routeData?.candidateRoutes?.[selectedRouteIndex ?? 0]?.distance_km ||
+          routeData?.primaryRoute?.distance_km ||
+          0
+        }
+        remainingDurationMinutes={
+          routeData?.candidateRoutes?.[selectedRouteIndex ?? 0]?.duration_minutes ||
+          routeData?.primaryRoute?.duration_minutes ||
+          0
+        }
+        currentSpeedKmh={speed ?? (isNavigating ? 50 : 0)}
+        heading={heading ?? null}
+        followMode={Boolean(followMode)}
+        isSimulated={Boolean(isSimulated)}
+        threatAlert={threatAlert ?? null}
+        onExitNavigation={onExitNavigation || (() => {})}
+        onToggleFollowMode={onToggleFollowMode || (() => {})}
+        onAcceptDetour={onAcceptDetour || (() => {})}
+        onDismissThreatAlert={onDismissThreatAlert || (() => {})}
+        onToggleSimulation={onToggleSimulation}
+      />
 
       {/* Map Overlay Controls / Legend */}
       <div className="absolute top-3 right-3 z-[1000] bg-white/95 dark:bg-slate-900/90 backdrop-blur-md p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-xl text-xs space-y-2 max-w-[220px] transition-colors duration-200">
