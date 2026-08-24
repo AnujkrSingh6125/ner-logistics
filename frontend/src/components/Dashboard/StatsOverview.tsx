@@ -29,7 +29,7 @@ export default function StatsOverview({
   ).length;
 
   const totalCapacityTonnes = hubs.reduce(
-    (sum, h) => sum + (Number(h.capacity_tonnes) || 0),
+    (sum, h) => sum + (Number(h.capacity_tons) || Number(h.capacity_tonnes) || 0),
     0
   );
 
