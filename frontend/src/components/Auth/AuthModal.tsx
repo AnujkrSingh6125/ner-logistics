@@ -48,9 +48,76 @@ export default function AuthModal() {
   const [signupPhone, setSignupPhone] = useState('+91 ');
   const [signupPassword, setSignupPassword] = useState('');
 
-  // Email OTP Verification State
+  // Email OTP Verification State (6-Digit Individual Boxes)
   const [emailOtpInput, setEmailOtpInput] = useState('');
+  const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [otpCountdown, setOtpCountdown] = useState(60);
+  const otpInputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
+
+  useEffect(() => {
+    if (pendingSignup) {
+      setOtpDigits(['', '', '', '', '', '']);
+      setEmailOtpInput('');
+      setTimeout(() => {
+        otpInputRefs.current[0]?.focus();
+      }, 150);
+    }
+  }, [pendingSignup]);
+
+  const handleOtpDigitChange = (index: number, value: string) => {
+    const clean = value.replace(/\D/g, '');
+    if (!clean) {
+      const newDigits = [...otpDigits];
+      newDigits[index] = '';
+      setOtpDigits(newDigits);
+      setEmailOtpInput(newDigits.join(''));
+      return;
+    }
+
+    if (clean.length > 1) {
+      const chars = clean.slice(0, 6).split('');
+      const newDigits = [...otpDigits];
+      chars.forEach((c, i) => {
+        if (i < 6) newDigits[i] = c;
+      });
+      setOtpDigits(newDigits);
+      setEmailOtpInput(newDigits.join(''));
+      const nextIdx = Math.min(chars.length, 5);
+      otpInputRefs.current[nextIdx]?.focus();
+      return;
+    }
+
+    const newDigits = [...otpDigits];
+    newDigits[index] = clean[clean.length - 1];
+    setOtpDigits(newDigits);
+    setEmailOtpInput(newDigits.join(''));
+
+    if (index < 5 && clean) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (pastedData) {
+      const chars = pastedData.split('');
+      const newDigits = ['', '', '', '', '', ''];
+      chars.forEach((c, i) => {
+        newDigits[i] = c;
+      });
+      setOtpDigits(newDigits);
+      setEmailOtpInput(newDigits.join(''));
+      const focusIndex = Math.min(chars.length, 5);
+      otpInputRefs.current[focusIndex]?.focus();
+    }
+  };
 
   // Government Official Login State
   const [govAgency, setGovAgency] = useState('Border Roads Organisation (BRO)');
@@ -321,17 +388,17 @@ export default function AuthModal() {
           {activeTab === 'public' && (
             <div>
               {pendingSignup ? (
-                /* EMAIL OTP VERIFICATION SCREEN */
+                /* 6-DIGIT EMAIL OTP VERIFICATION SCREEN */
                 <form onSubmit={handleVerifyEmailOTP} className="space-y-4">
-                  <div className="p-3.5 rounded-xl bg-blue-950/40 border border-blue-800/50 space-y-1.5">
+                  <div className="p-3.5 rounded-2xl bg-blue-950/40 border border-blue-800/50 space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-blue-300">Email Verification Code</span>
+                      <span className="text-xs font-semibold text-blue-300">6-Digit Verification Code</span>
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-cyan-300 font-mono font-bold">
                         {pendingSignup.citizen_uid || 'UID PENDING'}
                       </span>
                     </div>
                     <p className="text-xs text-slate-300">
-                      We have sent a 6-digit verification code via Brevo to{' '}
+                      Enter the 6-digit verification code dispatched to{' '}
                       <strong className="text-cyan-300 font-mono">{pendingSignup.email}</strong>
                     </p>
                   </div>
@@ -340,44 +407,70 @@ export default function AuthModal() {
                   <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between text-xs">
                     <span className="text-slate-400 flex items-center gap-1.5">
                       <Phone className="w-3.5 h-3.5 text-slate-500" />
-                      <span>Registered Contact Number:</span>
+                      <span>Registered Telemetry Phone:</span>
                     </span>
                     <span className="font-mono font-bold text-emerald-400">{pendingSignup.phone}</span>
                   </div>
 
-                  {/* 6-Digit OTP Code Input */}
-                  <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                  {/* 6-Digit Individual Numeric Boxes */}
+                  <div className="p-4 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-3">
                     <div className="flex items-center justify-between text-xs">
-                      <label className="font-semibold text-cyan-300 flex items-center gap-1.5">
-                        <Mail className="w-4 h-4 text-cyan-400" />
-                        <span>Enter 6-Digit Verification Code</span>
+                      <label className="font-bold text-cyan-300 flex items-center gap-1.5">
+                        <KeyRound className="w-4 h-4 text-cyan-400" />
+                        <span>Enter 6-Digit One-Time Code</span>
                       </label>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {otpDigits.filter(Boolean).length}/6 digits
+                      </span>
                     </div>
-                    <input
-                      type="text"
-                      maxLength={6}
-                      value={emailOtpInput}
-                      onChange={(e) => setEmailOtpInput(e.target.value.replace(/\D/g, ''))}
-                      placeholder="e.g. 492108"
-                      className="w-full text-center tracking-[0.4em] font-mono text-2xl py-3 rounded-lg bg-slate-900 border border-slate-700 text-cyan-300 placeholder-slate-600 focus:outline-none focus:border-cyan-500 shadow-inner"
-                      required
-                    />
-                    <p className="text-[10px] text-slate-400 text-center">
-                      Code valid for 10 minutes. Check your inbox and spam folder.
-                    </p>
+
+                    <div
+                      className="flex items-center justify-between gap-1.5 sm:gap-2.5"
+                      onPaste={handleOtpPaste}
+                    >
+                      {otpDigits.map((digit, idx) => (
+                        <input
+                          key={idx}
+                          ref={(el) => {
+                            otpInputRefs.current[idx] = el;
+                          }}
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={6}
+                          value={digit}
+                          onChange={(e) => handleOtpDigitChange(idx, e.target.value)}
+                          onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                          className={`w-11 h-13 sm:w-12 sm:h-14 text-center font-mono text-xl sm:text-2xl font-black rounded-xl border transition-all duration-150 ${
+                            digit
+                              ? 'bg-cyan-950/70 border-cyan-400 text-cyan-200 shadow-md shadow-cyan-900/30 ring-1 ring-cyan-400/40'
+                              : 'bg-slate-900/90 border-slate-700/80 text-slate-200 focus:border-cyan-400 focus:bg-slate-900 focus:ring-2 focus:ring-cyan-500/20'
+                          } focus:outline-none`}
+                        />
+                      ))}
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                      <span>Code valid for 10 minutes</span>
+                      {pendingSignup.mockOtp && (
+                        <span className="font-mono text-[10px] bg-slate-800/90 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
+                          Dev Fallback: <strong className="text-cyan-300">{pendingSignup.mockOtp}</strong>
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <button
                     type="submit"
-                    disabled={isLoading || emailOtpInput.length < 6}
+                    disabled={isLoading || otpDigits.filter(Boolean).length < 6}
                     className="w-full py-3 rounded-xl font-semibold text-sm bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white disabled:opacity-50 transition shadow"
                   >
                     {isLoading ? (
                       <span className="flex items-center justify-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" /> Verifying & Activating Profile...
+                        <Loader2 className="w-4 h-4 animate-spin" /> Verifying 6-Digit OTP...
                       </span>
                     ) : (
-                      'Verify Email & Activate Citizen Account'
+                      'Verify Code & Activate Citizen Account'
                     )}
                   </button>
 
@@ -386,7 +479,7 @@ export default function AuthModal() {
                       type="button"
                       onClick={handleResendCode}
                       disabled={otpCountdown > 0 || isLoading}
-                      className="text-cyan-400 hover:underline disabled:opacity-40"
+                      className="text-cyan-400 hover:underline disabled:opacity-40 font-medium"
                     >
                       {otpCountdown > 0 ? `Resend Code in ${otpCountdown}s` : 'Resend Verification Code'}
                     </button>

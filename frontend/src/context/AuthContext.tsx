@@ -576,7 +576,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
-  // 4. Send Brevo Email Verification OTP & Synchronize with Supabase Auth
+  // 4. Send 6-Digit Email Verification OTP & Synchronize with Supabase Auth
   const sendEmailOTP = async (
     fullName: string,
     email: string,
@@ -588,7 +588,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const cleanName = fullName.trim();
     const generatedUid = `NER-CIT-${Math.floor(10000 + Math.random() * 90000)}`;
 
-    // A. Check if Supabase Auth instantly verifies (if email confirmation is turned off in Supabase)
+    console.log('===========================================================');
+    console.log('[SUPABASE 6-DIGIT OTP AUTHENTICATION INITIATED]');
+    console.log('📧 Email:       ', cleanEmail);
+    console.log('👤 Name:        ', cleanName);
+    console.log('📱 Phone:       ', cleanPhone);
+    console.log('💡 TIP: Supabase Dashboard -> Authentication -> Email Templates');
+    console.log('   "Confirm signup" must use {{ .Token }} instead of {{ .ConfirmationURL }}');
+    console.log('===========================================================');
+
+    // A. Trigger Supabase Client OTP Registration
     if (supabase) {
       try {
         const { data: supaAuthData, error: supaAuthErr } = await supabase.auth.signUp({
@@ -601,11 +610,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               full_name: cleanName,
               phone: cleanPhone,
             },
+            emailRedirectTo: undefined,
           },
         });
 
         if (supaAuthData?.session && supaAuthData.user) {
-          console.log('[SUPABASE AUTH] Instant account activation without email block');
+          console.log('[SUPABASE AUTH] Instant account activation without email confirmation block');
           let instantProfile: UserProfile = {
             id: supaAuthData.user.id,
             citizen_uid: generatedUid,
@@ -628,14 +638,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             message: `Account Activated! Welcome, ${cleanName}.`,
           };
         } else if (supaAuthErr) {
-          console.warn('[SUPABASE AUTH NOTICE]:', supaAuthErr.message);
+          console.warn('[SUPABASE AUTH SIGNUP NOTICE]:', supaAuthErr.message);
         }
       } catch (authEx) {
         console.warn('[SUPABASE AUTH SIGNUP EXCEPTION]:', authEx);
       }
     }
 
-    // B. Dispatch Brevo Email OTP
+    // B. Dispatch Brevo / Backend Email OTP
     try {
       const res = await fetch('/api/auth/send-otp', {
         method: 'POST',
@@ -657,14 +667,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password_hash: password || 'Citizen@2026',
         mockOtp: data.otp || '492108',
         citizen_uid: generatedUid,
-        channel: data.diagnostics?.channel || 'Brevo Transactional Email',
+        channel: data.diagnostics?.channel || 'Brevo Transactional Email / Supabase OTP',
         isEmailLiveSent: data.diagnostics?.isEmailLiveSent ?? true,
       });
 
       if (res.ok && data.success) {
         return {
           success: true,
-          message: data.message || `Verification code sent to ${cleanEmail}.`,
+          message: data.message || `6-digit verification code sent to ${cleanEmail}.`,
         };
       }
 
@@ -692,7 +702,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // 5. Verify Brevo Email OTP & Commit to Supabase client_users
+  // 5. Verify 6-Digit OTP via Supabase auth.verifyOtp & Commit to client_users
   const verifyEmailOTP = async (
     otpCode: string
   ): Promise<{ success: boolean; message: string }> => {
@@ -702,6 +712,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const trimmed = otpCode.trim();
 
+    // A. Direct Supabase auth.verifyOtp Attempt
+    if (supabase) {
+      try {
+        let { data: supaVerifyData, error: supaVerifyErr } = await supabase.auth.verifyOtp({
+          email: pendingSignup.email,
+          token: trimmed,
+          type: 'signup',
+        });
+
+        if (supaVerifyErr) {
+          // If signup verification failed, retry with type 'email'
+          const retry = await supabase.auth.verifyOtp({
+            email: pendingSignup.email,
+            token: trimmed,
+            type: 'email',
+          });
+          if (!retry.error && retry.data?.user) {
+            supaVerifyData = retry.data;
+            supaVerifyErr = null;
+          }
+        }
+
+        if (!supaVerifyErr && supaVerifyData?.user) {
+          console.log('[SUPABASE 6-DIGIT OTP VERIFIED]:', supaVerifyData.user.id);
+          const userMeta = supaVerifyData.user.user_metadata || {};
+          let verifiedProfile: UserProfile = {
+            id: supaVerifyData.user.id,
+            citizen_uid: userMeta.citizen_uid || pendingSignup.citizen_uid,
+            email: supaVerifyData.user.email || pendingSignup.email,
+            phone: userMeta.phone || pendingSignup.phone,
+            full_name: userMeta.full_name || pendingSignup.full_name,
+            role: 'citizen',
+            state: 'Assam',
+            is_verified: true,
+            is_sharing_location: true,
+            current_lat: 26.1445,
+            current_lng: 91.7362,
+            created_at: new Date().toISOString(),
+          };
+
+          verifiedProfile = await syncCitizenToSupabase(verifiedProfile);
+          saveSession(verifiedProfile);
+          closeAuthModal();
+          return {
+            success: true,
+            message: `OTP Verified! Welcome, ${verifiedProfile.full_name}.`,
+          };
+        }
+      } catch (verifyEx) {
+        console.warn('[SUPABASE AUTH verifyOtp NOTICE]:', verifyEx);
+      }
+    }
+
+    // B. Backend / Brevo Verification
     try {
       const res = await fetch('/api/auth/verify-otp', {
         method: 'POST',
@@ -764,7 +828,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       return {
         success: false,
-        message: data.error || 'Invalid verification code. Please check your email.',
+        message: data.error || 'Invalid 6-digit verification code. Please check your email.',
       };
     } catch (err: any) {
       if (

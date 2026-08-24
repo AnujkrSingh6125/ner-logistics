@@ -2,6 +2,10 @@
 const nextConfig = {
   reactStrictMode: false,
   swcMinify: true,
+  experimental: {
+    workerThreads: false,
+    cpus: 1,
+  },
   onDemandEntries: {
     maxInactiveAge: 60 * 1000,
     pagesBufferLength: 5,

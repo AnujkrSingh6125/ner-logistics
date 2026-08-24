@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:clean": "node -e \"try{require('child_process').execSync('taskkill /F /IM node.exe')}catch(e){}\" && next dev",
-    "build": "next build",
+    "build": "node --max-old-space-size=4096 ./node_modules/next/dist/bin/next build",
     "start": "next start",
     "lint": "next lint"
   },
