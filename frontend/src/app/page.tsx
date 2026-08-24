@@ -116,7 +116,16 @@ export default function DashboardPage() {
       ]);
       if (hubsData && hubsData.length > 0) setHubs(hubsData);
       if (disruptionsData && disruptionsData.length > 0) setDisruptions(disruptionsData);
-      if (shipmentsData) setShipments(shipmentsData);
+      if (shipmentsData) {
+        console.log(`[GLOBAL HYDRATION] Populated ${shipmentsData.length} active convoys from PostgreSQL.`);
+        setShipments(shipmentsData);
+        setTrackedShipment((prevTracked) => {
+          if (!prevTracked && shipmentsData.length > 0) {
+            return shipmentsData[0];
+          }
+          return prevTracked;
+        });
+      }
     } catch (err) {
       console.warn('Supabase fetch error, fallback active:', err);
     } finally {
@@ -190,21 +199,29 @@ export default function DashboardPage() {
     };
   }, [routeData, originHub, destHub, selectedRouteIndex, cargoTier]);
 
-  // Realtime Supabase Subscription on shipments table
+  // Realtime Supabase Subscription on public.shipments table (Global Fleet Sync)
   useEffect(() => {
-    const unsub = subscribeToAllShipmentsRealtime((incomingShipment) => {
-      setShipments((prev) => {
-        const exists = prev.some((s) => s.id === incomingShipment.id);
-        if (exists) {
-          return prev.map((s) => (s.id === incomingShipment.id ? incomingShipment : s));
-        }
-        return [incomingShipment, ...prev];
-      });
+    const unsub = subscribeToAllShipmentsRealtime(
+      (incomingShipment) => {
+        console.log('[REALTIME BROADCAST RECEIVED] Convoy dispatch updated:', incomingShipment.id, incomingShipment.driver_name);
+        setShipments((prev) => {
+          const exists = prev.some((s) => s.id === incomingShipment.id);
+          if (exists) {
+            return prev.map((s) => (s.id === incomingShipment.id ? incomingShipment : s));
+          }
+          return [incomingShipment, ...prev];
+        });
 
-      setTrackedShipment((current) =>
-        current?.id === incomingShipment.id ? incomingShipment : current
-      );
-    });
+        setTrackedShipment((current) =>
+          current?.id === incomingShipment.id ? incomingShipment : current
+        );
+      },
+      (deletedId) => {
+        console.log('[REALTIME BROADCAST RECEIVED] Convoy shipment deleted:', deletedId);
+        setShipments((prev) => prev.filter((s) => s.id !== deletedId));
+        setTrackedShipment((current) => (current?.id === deletedId ? null : current));
+      }
+    );
 
     return () => {
       unsub();

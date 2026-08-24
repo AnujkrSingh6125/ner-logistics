@@ -396,12 +396,14 @@ export interface Shipment {
   origin?: { name: string; latitude: number; longitude: number } | string;
   destination?: { name: string; latitude: number; longitude: number } | string;
   current_status: ShipmentStatus;
+  status?: ShipmentStatus | string;
   current_lat?: number;
   current_lng?: number;
   heading?: number;
   speed?: number;
   speed_kmh?: number;
   weight_tonnes: number;
+  threat_score?: number;
   dispatched_by_hub_id?: string;
   notes?: string;
   created_at?: string;

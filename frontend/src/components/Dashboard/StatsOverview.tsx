@@ -20,7 +20,12 @@ export default function StatsOverview({
   ).length;
 
   const inTransitShipments = shipments.filter(
-    (s) => s.current_status === 'IN_TRANSIT' || s.current_status === 'REROUTED'
+    (s) =>
+      s.current_status === 'IN_TRANSIT' ||
+      s.current_status === 'REROUTED' ||
+      (s as any).status === 'IN_TRANSIT' ||
+      (s as any).status === 'REROUTED' ||
+      !s.current_status
   ).length;
 
   const totalCapacityTonnes = hubs.reduce(

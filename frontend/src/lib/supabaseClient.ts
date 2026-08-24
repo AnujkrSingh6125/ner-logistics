@@ -302,6 +302,58 @@ export async function resetSimulatedDisruptions(): Promise<RoadDisruption[]> {
   return BASELINE_DISRUPTIONS;
 }
 
+// Helper to check valid UUID
+export const isValidUUID = (val?: string) =>
+  Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val));
+
+// Universal Shipment Normalizer
+export const normalizeShipment = (item: any): Shipment => {
+  const originLat = Number(item.origin_lat) || (typeof item.origin === 'object' && Number(item.origin?.latitude)) || Number(item.current_lat) || 26.1445;
+  const originLng = Number(item.origin_lng) || (typeof item.origin === 'object' && Number(item.origin?.longitude)) || Number(item.current_lng) || 91.7362;
+  const destLat = Number(item.destination_lat) || (typeof item.destination === 'object' && Number(item.destination?.latitude)) || 25.5788;
+  const destLng = Number(item.destination_lng) || (typeof item.destination === 'object' && Number(item.destination?.longitude)) || 91.8933;
+
+  const originName = item.origin_name || (typeof item.origin === 'string' ? item.origin : item.origin?.name) || 'Guwahati Regional Hub';
+  const destName = item.destination_name || (typeof item.destination === 'string' ? item.destination : item.destination?.name) || 'Shillong Forward Terminal';
+
+  return {
+    id: item.id ? String(item.id) : `shp-${Date.now()}`,
+    tracking_code: item.tracking_code || `NER-SHP-${item.id ? String(item.id).slice(0, 4).toUpperCase() : Math.floor(1000 + Math.random() * 9000)}`,
+    driver_id: item.driver_id || 'NER-CIT-UNASSIGNED',
+    driver_name: item.driver_name || 'Driver In Transit',
+    origin_hub_id: isValidUUID(item.origin_hub_id) ? item.origin_hub_id : undefined,
+    origin_name: originName,
+    origin: {
+      name: originName,
+      latitude: originLat,
+      longitude: originLng,
+    },
+    destination_hub_id: isValidUUID(item.destination_hub_id) ? item.destination_hub_id : undefined,
+    destination_name: destName,
+    destination: {
+      name: destName,
+      latitude: destLat,
+      longitude: destLng,
+    },
+    cargo_type: item.cargo_type || 'GENERAL',
+    cargo_tier: item.cargo_tier || 'TIER_1_CRITICAL',
+    cargo_manifest: item.cargo_manifest || 'Essential Logistics Consignment',
+    priority_level: Number(item.priority_level) || 4,
+    weight_tonnes: Number(item.weight_tonnes) || 5,
+    current_status: item.current_status || item.status || 'IN_TRANSIT',
+    current_lat: Number(item.current_lat) || originLat,
+    current_lng: Number(item.current_lng) || originLng,
+    heading: Number(item.heading) || 0,
+    speed: Number(item.speed) || Number(item.speed_kmh) || 45,
+    speed_kmh: Number(item.speed_kmh) || Number(item.speed) || 45,
+    dispatched_by_hub_id: item.dispatched_by_hub_id,
+    threat_score: Number(item.threat_score) || 0,
+    notes: item.notes,
+    created_at: item.created_at || new Date().toISOString(),
+    last_ping_at: item.last_ping_at || new Date().toISOString(),
+  };
+};
+
 // Fetch Shipments strictly from database (or local memory if offline)
 export async function fetchShipments(): Promise<Shipment[]> {
   if (supabase) {
@@ -310,12 +362,12 @@ export async function fetchShipments(): Promise<Shipment[]> {
         .from('shipments')
         .select('*')
         .order('created_at', { ascending: false });
-      if (!error && data) {
-        const dbList = data.map((item: any) => ({
-          ...item,
-          origin_name: item.origin_name || (typeof item.origin === 'object' ? item.origin?.name : item.origin) || 'Origin Hub',
-          destination_name: item.destination_name || (typeof item.destination === 'object' ? item.destination?.name : item.destination) || 'Destination Hub',
-        })) as Shipment[];
+
+      if (error) {
+        console.error('[SUPABASE FETCH SHIPMENTS ERROR]:', error.message);
+      } else if (data) {
+        console.log(`[SUPABASE HYDRATION] Hydrated ${data.length} active shipments from PostgreSQL.`);
+        const dbList = data.map(normalizeShipment);
         activeShipmentsMemory = dbList;
         return dbList;
       }
@@ -326,10 +378,6 @@ export async function fetchShipments(): Promise<Shipment[]> {
 
   return activeShipmentsMemory;
 }
-
-// Helper to check valid UUID
-const isValidUUID = (val?: string) =>
-  Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val));
 
 // Insert Shipment strictly for Authorized Supply Hub Accounts
 export async function insertShipment(
@@ -342,7 +390,7 @@ export async function insertShipment(
   const destLat = Number(input.destination_lat) || 25.5788;
   const destLng = Number(input.destination_lng) || 91.8933;
 
-  const newShipment: Shipment = {
+  let newShipment: Shipment = {
     id: `shp-${Date.now()}`,
     tracking_code: trackingCode,
     driver_id: input.driver_id || `NER-CIT-${Math.floor(10000 + Math.random() * 90000)}`,
@@ -395,13 +443,14 @@ export async function insertShipment(
         cargo_manifest: newShipment.cargo_manifest,
         priority_level: newShipment.priority_level,
         weight_tonnes: newShipment.weight_tonnes,
-        current_status: newShipment.current_status,
-        status: newShipment.current_status,
-        current_lat: newShipment.current_lat,
-        current_lng: newShipment.current_lng,
-        heading: newShipment.heading,
-        speed: newShipment.speed,
-        dispatched_by_hub_id: newShipment.dispatched_by_hub_id,
+        current_status: 'IN_TRANSIT',
+        status: 'IN_TRANSIT',
+        current_lat: originLat,
+        current_lng: originLng,
+        heading: 0,
+        speed: 45,
+        threat_score: 0,
+        dispatched_by_hub_id: newShipment.dispatched_by_hub_id || null,
         notes: newShipment.notes || null,
         created_at: newShipment.created_at,
         last_ping_at: newShipment.last_ping_at,
@@ -414,7 +463,7 @@ export async function insertShipment(
         payload.destination_hub_id = newShipment.destination_hub_id;
       }
 
-      console.log('[SUPABASE SHIPMENT INSERT PAYLOAD]:', payload);
+      console.log('[SUPABASE DISPATCH INSERT PAYLOAD]:', payload);
       const { data, error } = await supabase
         .from('shipments')
         .insert([payload])
@@ -422,17 +471,17 @@ export async function insertShipment(
         .single();
 
       if (!error && data) {
-        console.log('[SUPABASE SHIPMENT SAVED SUCCESSFULLY]:', data.id, data.tracking_code);
-        newShipment.id = data.id;
+        console.log('[SUPABASE DISPATCH PERSISTED TO POSTGRESQL]:', data.id, data.tracking_code);
+        newShipment = normalizeShipment(data);
       } else if (error) {
-        console.error('[SUPABASE SHIPMENT SAVE ERROR]:', error.message, error.details || error);
+        console.error('[SUPABASE DISPATCH PERSISTENCE ERROR]:', error.message, error.details || error);
       }
     } catch (err) {
       console.error('[SUPABASE SHIPMENT INSERT EXCEPTION]:', err);
     }
   }
 
-  activeShipmentsMemory = [newShipment, ...activeShipmentsMemory];
+  activeShipmentsMemory = [newShipment, ...activeShipmentsMemory.filter((s) => s.id !== newShipment.id)];
   return newShipment;
 }
 
@@ -502,7 +551,7 @@ export function subscribeToShipmentRealtime(
         },
         (payload: any) => {
           if (payload.new) {
-            onUpdate(payload.new as Shipment);
+            onUpdate(normalizeShipment(payload.new));
           }
         }
       )
@@ -519,13 +568,15 @@ export function subscribeToShipmentRealtime(
 
 // Supabase Realtime WebSocket subscription for all fleet shipments
 export function subscribeToAllShipmentsRealtime(
-  onUpdate: (shipment: Shipment) => void
+  onUpdate: (shipment: Shipment) => void,
+  onDelete?: (deletedId: string) => void
 ) {
   if (!supabase) return () => {};
 
   try {
+    console.log('[SUPABASE REALTIME] Subscribing to public:shipments broadcast channel...');
     const channel = supabase
-      .channel('all-shipments-telemetry')
+      .channel('realtime-all-shipments')
       .on(
         'postgres_changes',
         {
@@ -534,12 +585,18 @@ export function subscribeToAllShipmentsRealtime(
           table: 'shipments',
         },
         (payload: any) => {
-          if (payload.new) {
-            onUpdate(payload.new as Shipment);
+          console.log('[SUPABASE REALTIME SHIPMENTS POSTGRES_CHANGE]', payload.eventType, payload);
+          if (payload.eventType === 'DELETE' && payload.old?.id && onDelete) {
+            onDelete(String(payload.old.id));
+          } else if (payload.new) {
+            const normalized = normalizeShipment(payload.new);
+            onUpdate(normalized);
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[SUPABASE REALTIME SHIPMENTS CHANNEL SUBSCRIPTION STATUS]:', status);
+      });
 
     return () => {
       supabase.removeChannel(channel);
