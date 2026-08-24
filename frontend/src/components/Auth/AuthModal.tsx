@@ -452,11 +452,7 @@ export default function AuthModal() {
 
                     <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
                       <span>Code valid for 10 minutes</span>
-                      {pendingSignup.mockOtp && (
-                        <span className="font-mono text-[10px] bg-slate-800/90 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
-                          Dev Fallback: <strong className="text-cyan-300">{pendingSignup.mockOtp}</strong>
-                        </span>
-                      )}
+                      <span className="text-cyan-400/80 font-medium">Check your email inbox</span>
                     </div>
                   </div>
 

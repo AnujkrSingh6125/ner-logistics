@@ -42,9 +42,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: result.message,
-      otp: result.otp,
-      diagnostics: result.diagnostics,
+      message: `A 6-digit verification code has been sent to ${targetEmail}. Please check your inbox.`,
+      diagnostics: {
+        isEmailLiveSent: result.diagnostics.isEmailLiveSent,
+        channel: result.diagnostics.channel,
+      },
     });
   } catch (error: any) {
     console.error('[SEND-OTP EXCEPTION]', error);

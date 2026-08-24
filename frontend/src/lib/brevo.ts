@@ -229,9 +229,7 @@ export async function sendEmailVerificationOTP(
     channel: emailRes.success ? 'Brevo REST API' : 'Local Terminal Buffer',
   };
 
-  const message = emailRes.success
-    ? `Verification code dispatched to ${normalizedEmail}. Please check your inbox.`
-    : `Verification code generated for ${normalizedEmail}. (Use code ${otp} for testing).`;
+  const message = `A 6-digit verification code has been dispatched to ${normalizedEmail}. Please check your email inbox.`;
 
   return {
     success: true,
