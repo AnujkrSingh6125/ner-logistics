@@ -1,0 +1,323 @@
+import { createClient } from '@supabase/supabase-js';
+import { SupplyHub, RoadDisruption, Shipment, SimulatedHazardInput } from '@/types';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+export const isSupabaseConfigured = Boolean(
+  supabaseUrl && supabaseAnonKey && !supabaseUrl.includes('your-project')
+);
+
+export const supabase = isSupabaseConfigured
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;
+
+// Baseline Regional Fallback Data
+export const BASELINE_SUPPLY_HUBS: SupplyHub[] = [
+  {
+    id: 'hub-01',
+    name: 'Guwahati Central Strategic Warehouse',
+    state: 'Assam',
+    latitude: 26.1445,
+    longitude: 91.7362,
+    capacity_tonnes: 500,
+    contact_person: 'Ranjit Baruah',
+    contact_phone: '+91 94350 11223',
+    is_active: true,
+  },
+  {
+    id: 'hub-02',
+    name: 'Silchar Barak Valley Hub',
+    state: 'Assam',
+    latitude: 24.8333,
+    longitude: 92.7789,
+    capacity_tonnes: 250,
+    contact_person: 'Debashish Nath',
+    contact_phone: '+91 94350 22334',
+    is_active: true,
+  },
+  {
+    id: 'hub-03',
+    name: 'Tezpur Northern Gateway',
+    state: 'Assam',
+    latitude: 26.6528,
+    longitude: 92.7926,
+    capacity_tonnes: 200,
+    contact_person: 'Pranab Saikia',
+    contact_phone: '+91 94350 33445',
+    is_active: true,
+  },
+  {
+    id: 'hub-04',
+    name: 'Jorhat Upper Assam Depot',
+    state: 'Assam',
+    latitude: 26.7509,
+    longitude: 94.2037,
+    capacity_tonnes: 220,
+    contact_person: 'Manish Gogoi',
+    contact_phone: '+91 94350 44556',
+    is_active: true,
+  },
+  {
+    id: 'hub-05',
+    name: 'Shillong Highland Transit Hub',
+    state: 'Meghalaya',
+    latitude: 25.5788,
+    longitude: 91.8933,
+    capacity_tonnes: 180,
+    contact_person: 'Banrap Marbaniang',
+    contact_phone: '+91 98620 55667',
+    is_active: true,
+  },
+  {
+    id: 'hub-06',
+    name: 'Imphal Eastern Logistics Terminal',
+    state: 'Manipur',
+    latitude: 24.8170,
+    longitude: 93.9368,
+    capacity_tonnes: 210,
+    contact_person: 'Ngangbam Singh',
+    contact_phone: '+91 98630 66778',
+    is_active: true,
+  },
+  {
+    id: 'hub-07',
+    name: 'Aizawl Southern Corridor Hub',
+    state: 'Mizoram',
+    latitude: 23.7271,
+    longitude: 92.7176,
+    capacity_tonnes: 160,
+    contact_person: 'Lalnunmawia Royte',
+    contact_phone: '+91 98640 77889',
+    is_active: true,
+  },
+  {
+    id: 'hub-08',
+    name: 'Agartala Border Trade Logistics Center',
+    state: 'Tripura',
+    latitude: 23.8315,
+    longitude: 91.2868,
+    capacity_tonnes: 230,
+    contact_person: 'Subir Debbarma',
+    contact_phone: '+91 98650 88990',
+    is_active: true,
+  },
+  {
+    id: 'hub-09',
+    name: 'Kohima Hill Logistics Center',
+    state: 'Nagaland',
+    latitude: 25.6751,
+    longitude: 94.1086,
+    capacity_tonnes: 140,
+    contact_person: 'Tepok Ao',
+    contact_phone: '+91 98660 99001',
+    is_active: true,
+  },
+  {
+    id: 'hub-10',
+    name: 'Dimapur Railhead Hub',
+    state: 'Nagaland',
+    latitude: 25.9068,
+    longitude: 93.7273,
+    capacity_tonnes: 350,
+    contact_person: 'Keviletuo Angami',
+    contact_phone: '+91 98670 10112',
+    is_active: true,
+  },
+  {
+    id: 'hub-11',
+    name: 'Itanagar Foothill Hub',
+    state: 'Arunachal Pradesh',
+    latitude: 27.0844,
+    longitude: 93.6053,
+    capacity_tonnes: 150,
+    contact_person: 'Takam Ringu',
+    contact_phone: '+91 98680 21223',
+    is_active: true,
+  },
+  {
+    id: 'hub-12',
+    name: 'Gangtok Himalayan Depot',
+    state: 'Sikkim',
+    latitude: 27.3389,
+    longitude: 88.6065,
+    capacity_tonnes: 120,
+    contact_person: 'Karma Bhutia',
+    contact_phone: '+91 98690 32334',
+    is_active: true,
+  },
+];
+
+export const BASELINE_DISRUPTIONS: RoadDisruption[] = [];
+
+// Active memory store for simulated disruptions
+let simulatedDisruptionsMemory: RoadDisruption[] = [];
+
+export const FALLBACK_SUPPLY_HUBS = BASELINE_SUPPLY_HUBS;
+export const FALLBACK_DISRUPTIONS: RoadDisruption[] = [];
+
+export const FALLBACK_SHIPMENTS: Shipment[] = [];
+
+// Fetch Supply Hubs (Supabase with Fallback)
+export async function fetchSupplyHubs(): Promise<SupplyHub[]> {
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('supply_hubs')
+        .select('*')
+        .order('state', { ascending: true });
+      if (!error && data && data.length > 0) {
+        return data as SupplyHub[];
+      }
+    } catch (err) {
+      console.warn('Supabase fetch error, using regional defaults:', err);
+    }
+  }
+  return BASELINE_SUPPLY_HUBS;
+}
+
+// Fetch Road Disruptions (Combines Supabase / Baseline + Injected Simulated Hazards)
+export async function fetchRoadDisruptions(): Promise<RoadDisruption[]> {
+  let baseList: RoadDisruption[] = BASELINE_DISRUPTIONS;
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('road_disruptions')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+      if (!error && data && data.length > 0) {
+        baseList = data as RoadDisruption[];
+      }
+    } catch (err) {
+      console.warn('Supabase fetch error, using regional defaults:', err);
+    }
+  }
+
+  // Merge in any active simulated disruptions from memory
+  const allDisruptions = [...simulatedDisruptionsMemory, ...baseList];
+  const unique = Array.from(new Map(allDisruptions.map((d) => [d.id, d])).values());
+  return unique;
+}
+
+// Insert Road Disruption strictly to Supabase with memory reactivity
+export async function insertSimulatedDisruption(
+  hazard: SimulatedHazardInput
+): Promise<RoadDisruption> {
+  const agency =
+    hazard.government_body_name ||
+    hazard.reported_by_agency ||
+    'Border Roads Organisation (BRO)';
+
+  const officialMessage = hazard.message || hazard.description || 'Road disruption advisory active.';
+
+  const insertPayload: any = {
+    title: hazard.title,
+    disruption_type: hazard.disruption_type,
+    hazard_type: hazard.disruption_type,
+    severity: hazard.severity,
+    risk_radius_meters: Number(hazard.risk_radius_meters) || 1000,
+    latitude: parseFloat(String(hazard.latitude)),
+    longitude: parseFloat(String(hazard.longitude)),
+    message: officialMessage.slice(0, 500),
+    highway_reference: hazard.highway_reference || 'Regional Highway',
+    description: hazard.description || officialMessage,
+    government_body_name: agency,
+    reported_by_agency: agency,
+    verified_by_official: hazard.verified_by_official || 'Verified Command Official',
+    is_active: true,
+    is_simulated: false,
+  };
+
+  if (hazard.created_by) {
+    insertPayload.created_by = hazard.created_by;
+  }
+
+  let createdDisruption: RoadDisruption = {
+    id: `disrupt-${Date.now()}`,
+    ...insertPayload,
+    created_at: new Date().toISOString(),
+  };
+
+  // Strictly save to Supabase
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('road_disruptions')
+        .insert([insertPayload])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Supabase Disruption Insert Error:', error);
+        throw new Error(`Failed to save hazard to database: ${error.message}`);
+      }
+
+      if (data) {
+        createdDisruption = data as RoadDisruption;
+      }
+    } catch (err: any) {
+      console.error('Supabase Disruption Insert Exception:', err);
+      throw err;
+    }
+  }
+
+  // Also add to memory store for immediate reactivity
+  simulatedDisruptionsMemory = [createdDisruption, ...simulatedDisruptionsMemory];
+  return createdDisruption;
+}
+
+// Delete Road Disruption from Supabase & Memory Store
+export async function deleteRoadDisruption(id: string): Promise<boolean> {
+  // Remove from local memory
+  simulatedDisruptionsMemory = simulatedDisruptionsMemory.filter((d) => d.id !== id);
+
+  if (supabase) {
+    try {
+      const { error } = await supabase
+        .from('road_disruptions')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Supabase delete disruption error:', error.message);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error('Failed to delete road disruption in Supabase:', err);
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// Reset Simulated Disruptions
+export async function resetSimulatedDisruptions(): Promise<RoadDisruption[]> {
+  simulatedDisruptionsMemory = [];
+  return BASELINE_DISRUPTIONS;
+}
+
+// Fetch Shipments (Supabase with Fallback)
+export async function fetchShipments(): Promise<Shipment[]> {
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('shipments')
+        .select('*, origin_hub:origin_hub_id(name), destination_hub:destination_hub_id(name)')
+        .order('priority_level', { ascending: false });
+      if (!error && data && data.length > 0) {
+        return data.map((item: any) => ({
+          ...item,
+          origin_name: item.origin_hub?.name || 'Hub Origin',
+          destination_name: item.destination_hub?.name || 'Hub Destination',
+        })) as Shipment[];
+      }
+    } catch (err) {
+      console.warn('Supabase fetch error, using regional defaults:', err);
+    }
+  }
+  return FALLBACK_SHIPMENTS;
+}
