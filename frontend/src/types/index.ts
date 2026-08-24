@@ -8,6 +8,17 @@ export type UserRole =
   | 'gov_official'
   | 'hub_operator';
 
+export interface Profile {
+  email: string;
+  user_id: string;
+  full_name: string | null;
+  phone: string | null;
+  role: string;
+  hub_id?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface ClientUser {
   id: string;
   citizen_uid: string;

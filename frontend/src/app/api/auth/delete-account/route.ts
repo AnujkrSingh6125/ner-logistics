@@ -33,10 +33,12 @@ export async function POST(req: Request) {
         await supabase.from('live_journeys').delete().eq('citizen_uid', citizenUid);
       }
 
-      // 3. Delete primary record from client_users table
+      // 3. Delete primary record from profiles (email PK) and client_users table
       if (targetEmail) {
+        await supabase.from('profiles').delete().eq('email', targetEmail);
         await supabase.from('client_users').delete().eq('email', targetEmail);
       } else if (userId) {
+        await supabase.from('profiles').delete().eq('user_id', userId);
         await supabase.from('client_users').delete().eq('id', userId);
       } else if (citizenUid) {
         await supabase.from('client_users').delete().eq('citizen_uid', citizenUid);

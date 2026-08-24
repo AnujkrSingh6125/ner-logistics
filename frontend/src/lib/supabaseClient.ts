@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { SupplyHub, RoadDisruption, Shipment, SimulatedHazardInput, RegisterShipmentInput, SystemBroadcast } from '@/types';
+import { SupplyHub, RoadDisruption, Shipment, SimulatedHazardInput, RegisterShipmentInput, SystemBroadcast, Profile } from '@/types';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -1093,6 +1093,61 @@ export async function verifyUserOtp(email: string, token: string) {
     throw error;
   }
   return data; // contains session and user
+}
+
+// Query user profile by Primary Key (email)
+export async function fetchProfileByEmail(email: string): Promise<Profile | null> {
+  const cleanEmail = email.trim().toLowerCase();
+  if (!supabase) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('email', cleanEmail)
+      .maybeSingle();
+
+    if (!error && data) {
+      return data as Profile;
+    }
+  } catch (err) {
+    console.warn('fetchProfileByEmail notice:', err);
+  }
+  return null;
+}
+
+// Upsert user profile record into public.profiles
+export async function upsertProfile(
+  profile: Partial<Profile> & { email: string; user_id: string }
+): Promise<Profile | null> {
+  const cleanEmail = profile.email.trim().toLowerCase();
+  if (!supabase) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .upsert(
+        {
+          email: cleanEmail,
+          user_id: profile.user_id,
+          full_name: profile.full_name || null,
+          phone: profile.phone || null,
+          role: profile.role || 'CITIZEN_DRIVER',
+          hub_id: profile.hub_id || null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'email' }
+      )
+      .select()
+      .single();
+
+    if (!error && data) {
+      return data as Profile;
+    }
+  } catch (err) {
+    console.warn('upsertProfile notice:', err);
+  }
+  return null;
 }
 
 // ============================================================================
