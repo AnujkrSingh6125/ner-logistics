@@ -405,6 +405,9 @@ export interface Shipment {
   weight_tonnes: number;
   threat_score?: number;
   dispatched_by_hub_id?: string;
+  hub_id?: string;
+  hub_code?: string;
+  created_by?: string;
   notes?: string;
   created_at?: string;
   last_ping_at?: string;

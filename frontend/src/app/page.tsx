@@ -18,6 +18,7 @@ import {
   fetchSupplyHubs,
   fetchRoadDisruptions,
   fetchShipments,
+  deleteShipment,
   updateShipmentTelemetry,
   subscribeToAllShipmentsRealtime,
   subscribeToAllHazardsRealtime,
@@ -347,6 +348,20 @@ export default function DashboardPage() {
     }
     setClickedMapCoords(coords);
     setSimulationModalOpen(true);
+  };
+
+  // Secure Multi-Tenant Delete Shipment Handler
+  const handleDeleteShipment = async (shipmentId: string) => {
+    const operatorHub = user?.hub_code || user?.id || user?.agency_name;
+    const res = await deleteShipment(shipmentId, operatorHub, user?.role);
+    if (!res.success) {
+      alert(res.message);
+      return;
+    }
+    setShipments((prev) => prev.filter((s) => s.id !== shipmentId));
+    if (trackedShipment?.id === shipmentId) {
+      setTrackedShipment(null);
+    }
   };
 
   // Submit newly simulated hazard with RBAC headers & auto-reroute
@@ -1011,6 +1026,7 @@ export default function DashboardPage() {
                   setTrackedShipment(s);
                   setMobileTab('map');
                 }}
+                onDeleteShipment={handleDeleteShipment}
               />
             </div>
           </div>
