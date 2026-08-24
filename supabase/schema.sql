@@ -1,6 +1,6 @@
 -- ============================================================================
 -- NER SMART LOGISTICS PLATFORM (SIH PROBLEM ID: 26002)
--- Master Standalone Database Schema: Tri-Table Architecture, Spatial Engine & Realtime Sync
+-- Unified Master Database Schema: Consolidated Client Profile, Spatial Engine & Realtime Sync
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -11,19 +11,12 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ----------------------------------------------------------------------------
--- 2. Table: user_profiles (Unified Profile / Backward Compatibility)
+-- 2. Drop Legacy Duplicate Profile Tables Safely
 -- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.user_profiles (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  email TEXT,
-  full_name TEXT,
-  role TEXT DEFAULT 'citizen', -- 'citizen', 'government_official', 'hub_manager'
-  government_agency TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+DROP TABLE IF EXISTS public.user_profiles CASCADE;
 
 -- ----------------------------------------------------------------------------
--- 3. Table: client_users (Public Citizens & Commercial Freight Drivers)
+-- 3. Table: client_users (Unified Citizen, Driver & Commercial Freight Profiles)
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.client_users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -33,7 +26,8 @@ CREATE TABLE IF NOT EXISTS public.client_users (
   phone TEXT,
   emergency_contact TEXT,
   driver_license TEXT,
-  role TEXT DEFAULT 'citizen' CHECK (role IN ('citizen', 'driver', 'public_user')),
+  role TEXT DEFAULT 'citizen' CHECK (role IN ('citizen', 'driver', 'public_user', 'hub_manager', 'government_official')),
+  agency_name TEXT,
   current_lat DOUBLE PRECISION,
   current_lng DOUBLE PRECISION,
   is_sharing_location BOOLEAN DEFAULT TRUE,
@@ -45,6 +39,7 @@ CREATE TABLE IF NOT EXISTS public.client_users (
 ALTER TABLE public.client_users ADD COLUMN IF NOT EXISTS emergency_contact TEXT;
 ALTER TABLE public.client_users ADD COLUMN IF NOT EXISTS driver_license TEXT;
 ALTER TABLE public.client_users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'citizen';
+ALTER TABLE public.client_users ADD COLUMN IF NOT EXISTS agency_name TEXT;
 ALTER TABLE public.client_users ADD COLUMN IF NOT EXISTS current_lat DOUBLE PRECISION;
 ALTER TABLE public.client_users ADD COLUMN IF NOT EXISTS current_lng DOUBLE PRECISION;
 ALTER TABLE public.client_users ADD COLUMN IF NOT EXISTS is_sharing_location BOOLEAN DEFAULT TRUE;
@@ -52,6 +47,42 @@ ALTER TABLE public.client_users ADD COLUMN IF NOT EXISTS last_location_update TI
 
 CREATE INDEX IF NOT EXISTS idx_client_users_email ON public.client_users (email);
 CREATE INDEX IF NOT EXISTS idx_client_users_uid ON public.client_users (citizen_uid);
+
+-- Automatic Supabase Auth Hook: Auto-populate client_users on new auth.users signup
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO public.client_users (
+        id,
+        citizen_uid,
+        full_name,
+        email,
+        phone,
+        role,
+        created_at,
+        updated_at
+    )
+    VALUES (
+        NEW.id,
+        'NER-CIT-' || UPPER(SUBSTRING(MD5(NEW.id::text || NOW()::text) FROM 1 FOR 6)),
+        COALESCE(NEW.raw_user_meta_data->>'full_name', SPLIT_PART(NEW.email, '@', 1)),
+        NEW.email,
+        NEW.raw_user_meta_data->>'phone',
+        COALESCE(NEW.raw_user_meta_data->>'role', 'citizen'),
+        NOW(),
+        NOW()
+    )
+    ON CONFLICT (email) DO UPDATE SET
+        full_name = EXCLUDED.full_name,
+        updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+AFTER INSERT ON auth.users
+FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ----------------------------------------------------------------------------
 -- 4. Table: government_officials (Defense, BRO & SDMA Command Authorities)
@@ -151,7 +182,7 @@ CREATE TABLE IF NOT EXISTS public.road_disruptions (
   longitude DOUBLE PRECISION NOT NULL,
   message VARCHAR(500) CHECK (char_length(message) <= 500),
   location_geom GEOMETRY(Point, 4326),
-  impact_zone GEOMETRY(Polygon, 4326),
+  impact_zone GEOMETRY(Geometry, 4326),
   highway_reference TEXT,
   description TEXT,
   reported_by_agency TEXT,
@@ -191,7 +222,7 @@ BEGIN
     -- Point geometry for the disruption origin
     NEW.location_geom := ST_SetSRID(ST_MakePoint(NEW.longitude, NEW.latitude), 4326);
     
-    -- Polygon/Multipolygon geometry for the impact / risk radius buffer
+    -- Polygon/MultiPolygon geometry for the impact / risk radius buffer
     IF NEW.risk_radius_meters IS NOT NULL AND NEW.risk_radius_meters > 0 THEN
         NEW.impact_zone := ST_Buffer(NEW.location_geom::geography, NEW.risk_radius_meters)::geometry;
     ELSE
@@ -272,7 +303,6 @@ CREATE INDEX IF NOT EXISTS idx_shipments_status ON public.shipments (current_sta
 -- ----------------------------------------------------------------------------
 -- 11. Enable Row Level Security (RLS)
 -- ----------------------------------------------------------------------------
-ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.client_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.government_officials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.supply_hub_terminals ENABLE ROW LEVEL SECURITY;
@@ -282,40 +312,30 @@ ALTER TABLE public.road_disruptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.supply_hubs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shipments ENABLE ROW LEVEL SECURITY;
 
--- 11.1 user_profiles Policies
-DO $$ BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'user_profiles' AND policyname = 'Allow public read access') THEN
-        CREATE POLICY "Allow public read access" ON public.user_profiles FOR SELECT USING (true);
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'user_profiles' AND policyname = 'Allow individual update') THEN
-        CREATE POLICY "Allow individual update" ON public.user_profiles FOR UPDATE USING (auth.uid() = id);
-    END IF;
-END $$;
-
--- 11.2 client_users Policies
+-- 11.1 client_users Policies
 DROP POLICY IF EXISTS "Public read access for client_users" ON public.client_users;
 CREATE POLICY "Public read access for client_users" ON public.client_users FOR SELECT USING (true);
 
 DROP POLICY IF EXISTS "Public insert/update for client_users" ON public.client_users;
 CREATE POLICY "Public insert/update for client_users" ON public.client_users FOR ALL USING (true);
 
--- 11.3 government_officials Policies
+-- 11.2 government_officials Policies
 DROP POLICY IF EXISTS "Public read access for government_officials" ON public.government_officials;
 CREATE POLICY "Public read access for government_officials" ON public.government_officials FOR SELECT USING (true);
 
--- 11.4 supply_hub_terminals Policies
+-- 11.3 supply_hub_terminals Policies
 DROP POLICY IF EXISTS "Public read access for supply_hub_terminals" ON public.supply_hub_terminals;
 CREATE POLICY "Public read access for supply_hub_terminals" ON public.supply_hub_terminals FOR SELECT USING (true);
 
--- 11.5 live_journeys Policies
+-- 11.4 live_journeys Policies
 DROP POLICY IF EXISTS "Public access for live_journeys" ON public.live_journeys;
 CREATE POLICY "Public access for live_journeys" ON public.live_journeys FOR ALL USING (true);
 
--- 11.6 system_broadcasts Policies
+-- 11.5 system_broadcasts Policies
 DROP POLICY IF EXISTS "Public access for system_broadcasts" ON public.system_broadcasts;
 CREATE POLICY "Public access for system_broadcasts" ON public.system_broadcasts FOR ALL USING (true);
 
--- 11.7 road_disruptions Policies (Universal SELECT, Gov INSERT, Strict Creator UPDATE/DELETE)
+-- 11.6 road_disruptions Policies (Universal SELECT, Gov INSERT, Strict Creator UPDATE/DELETE)
 DROP POLICY IF EXISTS "Allow public read access for road_disruptions" ON public.road_disruptions;
 DROP POLICY IF EXISTS "Public access for road_disruptions" ON public.road_disruptions;
 CREATE POLICY "Allow public read access for road_disruptions"
@@ -344,7 +364,7 @@ ON public.road_disruptions FOR DELETE
 TO authenticated
 USING (auth.uid() = created_by);
 
--- 11.8 supply_hubs & shipments Policies
+-- 11.7 supply_hubs & shipments Policies
 DROP POLICY IF EXISTS "Public access for supply_hubs" ON public.supply_hubs;
 CREATE POLICY "Public access for supply_hubs" ON public.supply_hubs FOR ALL USING (true);
 
@@ -427,103 +447,3 @@ ON CONFLICT (email) DO UPDATE SET
   state = EXCLUDED.state,
   capacity_tonnes = EXCLUDED.capacity_tonnes,
   contact_phone = EXCLUDED.contact_phone;
-
--- ----------------------------------------------------------------------------
--- 16. Seed Initial Baseline Road Disruptions
--- ----------------------------------------------------------------------------
-INSERT INTO public.road_disruptions (
-  title,
-  disruption_type,
-  severity,
-  risk_radius_meters,
-  latitude,
-  longitude,
-  highway_reference,
-  government_body_name,
-  message,
-  description,
-  is_active
-)
-VALUES
-  (
-    'Major Landslide near Kohima-Dimapur Bypass',
-    'LANDSLIDE',
-    'CRITICAL',
-    3000,
-    25.7820,
-    93.9210,
-    'NH-29',
-    'BRO Project Vartak',
-    'Mudslide at km 142. Sinking zone at Pagla Pahar restricts heavy multi-axle freight. Divert via NH-02.',
-    'Heavy mudslide blocked both lanes. Border Roads Organisation (BRO) clearing in progress.',
-    TRUE
-  ),
-  (
-    'Flash Flood Inundation at Silchar Kalain Highway',
-    'FLASH_FLOOD',
-    'HIGH',
-    2500,
-    24.9650,
-    92.6520,
-    'NH-6',
-    'Assam SDMA',
-    'Barak tributary inundation submerged 400m carriageway under 1.2m waters. Essential supply trucks on standby.',
-    'Barak river overflowing causing 3 feet waterlogging across 4km stretch.',
-    TRUE
-  ),
-  (
-    'Bridge Structural Fracture at Sonapur Tunnel approach',
-    'BRIDGE_DAMAGE',
-    'HIGH',
-    1500,
-    25.1850,
-    92.3680,
-    'NH-06',
-    'Meghalaya SDMA',
-    'Structural pier scour under emergency structural inspection. Heavy commercial vehicles >20T prohibited.',
-    'Pillar micro-cracks reported; heavy commercial trucks redirected.',
-    TRUE
-  ),
-  (
-    'Protest & Barricade near Senapati Border',
-    'ROAD_BLOCK',
-    'MEDIUM',
-    1200,
-    25.2630,
-    94.0210,
-    'NH-02',
-    'Manipur Police / Traffic Command',
-    'Localized transit blockade affecting freight movement towards Imphal. Security escort convoys operating.',
-    'Localized transit blockade affecting freight movement towards Imphal.',
-    TRUE
-  ),
-  (
-    'Rockfall Hazard near Bomdila Pass',
-    'LANDSLIDE',
-    'HIGH',
-    2000,
-    27.2640,
-    92.4210,
-    'NH-13',
-    'BRO Project Vartak',
-    'Continuous boulder rolling due to pre-monsoon precipitation. Night transit strictly suspended.',
-    'Continuous boulder rolling due to pre-monsoon precipitation.',
-    TRUE
-  )
-ON CONFLICT DO NOTHING;
-
--- ----------------------------------------------------------------------------
--- 17. Seed Initial Emergency System Broadcast
--- ----------------------------------------------------------------------------
-INSERT INTO public.system_broadcasts (issued_by_name, agency, severity, title, message, affected_region, is_active)
-VALUES
-  (
-    'Col. Rajeshwar Sharma',
-    'Border Roads Organisation (BRO)',
-    'CRITICAL',
-    'NH-29 Kohima-Dimapur Heavy Landslide Detour Activated',
-    'Mudslide blockages along NH-29 chainage km 142. Alternate mountain detour corridor activated via Project Vartak bypass route.',
-    'Nagaland & Manipur Freight Corridors',
-    TRUE
-  )
-ON CONFLICT DO NOTHING;

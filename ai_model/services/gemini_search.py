@@ -432,48 +432,8 @@ def _fetch_live_supabase_disruptions() -> List[Dict[str, Any]]:
     except Exception as e:
         logger.debug(f"Failed to fetch disruptions from Supabase REST API: {e}")
 
-    # Regional baseline fallback records if database is empty or offline
-    return [
-        {
-            "id": "disrupt-01",
-            "title": "Major Landslide near Kohima-Dimapur Bypass",
-            "disruption_type": "LANDSLIDE",
-            "severity": "CRITICAL",
-            "latitude": 25.7820,
-            "longitude": 93.9210,
-            "risk_radius_meters": 3000,
-            "highway_reference": "NH-29",
-            "description": "Pagla Pahar slope collapse and heavy mud accumulation. Sinking zone restricts heavy freight movement.",
-            "government_body_name": "BRO Project Vartak",
-            "reported_by_agency": "Border Roads Organisation (BRO)",
-        },
-        {
-            "id": "disrupt-02",
-            "title": "Severe Flash Flood Inundation & Culvert Breach",
-            "disruption_type": "FLASH_FLOOD",
-            "severity": "HIGH",
-            "latitude": 24.9500,
-            "longitude": 92.8200,
-            "risk_radius_meters": 2500,
-            "highway_reference": "NH-6 / NH-37 Junction",
-            "description": "Barak Valley tributary overflow submerged 400m of carriageway under 1.2m turbulent waters.",
-            "government_body_name": "Assam State Disaster Management Authority (ASDMA)",
-            "reported_by_agency": "Assam SDMA",
-        },
-        {
-            "id": "disrupt-03",
-            "title": "Bridge Structural Scour & Single-Lane Transit",
-            "disruption_type": "BRIDGE_DAMAGE",
-            "severity": "MEDIUM",
-            "latitude": 25.6200,
-            "longitude": 91.9500,
-            "risk_radius_meters": 1500,
-            "highway_reference": "NH-06 (Umiam Section)",
-            "description": "Bridge pier scour under assessment. Heavy multi-axle freight trucks >20 tonnes restricted.",
-            "government_body_name": "Meghalaya SDMA (MSDMA)",
-            "reported_by_agency": "Meghalaya SDMA",
-        },
-    ]
+    # Return clean empty list if database has no active disruptions
+    return []
 
 
 def _fallback_bounded_chat(query: str, disruptions: List[Dict[str, Any]]) -> Dict[str, Any]:

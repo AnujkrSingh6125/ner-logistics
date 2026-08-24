@@ -301,22 +301,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (clientErr) {
         console.warn('[SUPABASE client_users SYNC WARNING]:', clientErr.message);
       } else if (dbClient) {
-        // Also sync defensively to user_profiles if table is present
-        try {
-          await supabase.from('user_profiles').upsert(
-            {
-              id: dbClient.id,
-              email: dbClient.email,
-              full_name: dbClient.full_name,
-              role: dbClient.role || 'citizen',
-              government_agency: null,
-            },
-            { onConflict: 'id' }
-          );
-        } catch {
-          // Safe ignore if unneeded
-        }
-
         return {
           ...citizen,
           id: dbClient.id,

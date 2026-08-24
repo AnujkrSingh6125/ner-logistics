@@ -2,33 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 import { SystemBroadcast, BroadcastSeverity } from '@/types';
 
-// Regional Baseline Warnings Fallback
-const BASELINE_BROADCASTS: SystemBroadcast[] = [
-  {
-    id: 'broadcast-01',
-    issued_by_name: 'Col. Rajeshwar Sharma',
-    agency: 'Border Roads Organisation (BRO)',
-    severity: 'CRITICAL',
-    title: 'NH-29 Kohima-Dimapur Heavy Landslide Detour Activated',
-    message: 'Mudslide blockages along NH-29 chainage km 142. Alternate mountain detour corridor activated via Project Vartak bypass route.',
-    affected_region: 'Nagaland & Manipur Freight Corridors',
-    is_active: true,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'broadcast-02',
-    issued_by_name: 'Dr. Hemanta Baruah',
-    agency: 'Assam State Disaster Management Authority (ASDMA)',
-    severity: 'WARNING',
-    title: 'Flash Flood Watch: Barak Valley NH-6 Kalain Section',
-    message: 'Water level rising near Kalain. High-chassis freight convoys and emergency medical shipments given clearance with BRO escorts.',
-    affected_region: 'Assam - Barak Valley Corridor',
-    is_active: true,
-    created_at: new Date().toISOString(),
-  },
-];
+// Regional Baseline Warnings Fallback (starts empty for clean dynamic state)
+const BASELINE_BROADCASTS: SystemBroadcast[] = [];
 
-let memoryBroadcasts: SystemBroadcast[] = [...BASELINE_BROADCASTS];
+let memoryBroadcasts: SystemBroadcast[] = [];
 
 export async function GET() {
   try {
