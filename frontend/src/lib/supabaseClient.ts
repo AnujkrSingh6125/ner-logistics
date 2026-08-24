@@ -616,12 +616,14 @@ export function subscribeToAllHazardsRealtime(
   if (!supabase) return () => {};
 
   try {
+    console.log('[SUPABASE REALTIME] Subscribing to public:road_disruptions & hazards broadcast channels...');
     const channel = supabase
       .channel('realtime-hazards-corridor')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'road_disruptions' },
         (payload: any) => {
+          console.log('[SUPABASE REALTIME ROAD_DISRUPTIONS EVENT]:', payload.eventType, payload);
           if (payload.eventType === 'INSERT' && payload.new) {
             onInsert(payload.new as RoadDisruption);
           } else if (payload.eventType === 'UPDATE' && payload.new) {
@@ -635,6 +637,7 @@ export function subscribeToAllHazardsRealtime(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'hazards' },
         (payload: any) => {
+          console.log('[SUPABASE REALTIME HAZARDS EVENT]:', payload.eventType, payload);
           if (payload.eventType === 'INSERT' && payload.new) {
             const h = payload.new;
             onInsert({
@@ -672,7 +675,9 @@ export function subscribeToAllHazardsRealtime(
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[SUPABASE REALTIME HAZARDS CHANNEL SUBSCRIPTION STATUS]:', status);
+      });
 
     return () => {
       supabase.removeChannel(channel);

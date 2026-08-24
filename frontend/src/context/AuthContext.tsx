@@ -577,6 +577,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // 4. Send 6-Digit Email Verification OTP & Synchronize with Supabase Auth
+  // 4. Send 6-Digit Email Verification OTP & Synchronize with Supabase Auth
   const sendEmailOTP = async (
     fullName: string,
     email: string,
@@ -593,11 +594,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('📧 Email:       ', cleanEmail);
     console.log('👤 Name:        ', cleanName);
     console.log('📱 Phone:       ', cleanPhone);
+    console.log('🔒 Security:    Enforcing strict 6-digit OTP verification barrier');
     console.log('💡 TIP: Supabase Dashboard -> Authentication -> Email Templates');
     console.log('   "Confirm signup" must use {{ .Token }} instead of {{ .ConfirmationURL }}');
     console.log('===========================================================');
 
-    // A. Trigger Supabase Client OTP Registration
+    // A. Trigger Supabase Client OTP Registration (DO NOT auto-login or grant session)
     if (supabase) {
       try {
         const { data: supaAuthData, error: supaAuthErr } = await supabase.auth.signUp({
@@ -614,31 +616,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           },
         });
 
-        if (supaAuthData?.session && supaAuthData.user) {
-          console.log('[SUPABASE AUTH] Instant account activation without email confirmation block');
-          let instantProfile: UserProfile = {
-            id: supaAuthData.user.id,
-            citizen_uid: generatedUid,
-            email: cleanEmail,
-            phone: cleanPhone,
-            full_name: cleanName,
-            role: 'citizen',
-            state: 'Assam',
-            is_verified: true,
-            is_sharing_location: true,
-            current_lat: 26.1445,
-            current_lng: 91.7362,
-            created_at: new Date().toISOString(),
-          };
-          instantProfile = await syncCitizenToSupabase(instantProfile);
-          saveSession(instantProfile);
-          closeAuthModal();
-          return {
-            success: true,
-            message: `Account Activated! Welcome, ${cleanName}.`,
-          };
-        } else if (supaAuthErr) {
-          console.warn('[SUPABASE AUTH SIGNUP NOTICE]:', supaAuthErr.message);
+        if (supaAuthErr) {
+          if (supaAuthErr.message?.toLowerCase().includes('already registered')) {
+            console.log('[SUPABASE AUTH] User email registered, awaiting OTP token verification');
+          } else {
+            console.warn('[SUPABASE AUTH SIGNUP NOTICE]:', supaAuthErr.message);
+          }
+        } else {
+          console.log('[SUPABASE AUTH] Registration initiated. Staging user on 6-digit OTP verification barrier.');
         }
       } catch (authEx) {
         console.warn('[SUPABASE AUTH SIGNUP EXCEPTION]:', authEx);
@@ -660,6 +645,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const data = await res.json();
 
+      // Hold user on dedicated OTP verification screen
       setPendingSignup({
         full_name: cleanName,
         email: cleanEmail,
@@ -667,7 +653,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password_hash: password || 'Citizen@2026',
         mockOtp: data.otp || '492108',
         citizen_uid: generatedUid,
-        channel: data.diagnostics?.channel || 'Brevo Transactional Email / Supabase OTP',
+        channel: data.diagnostics?.channel || 'Supabase 6-Digit Email OTP',
         isEmailLiveSent: data.diagnostics?.isEmailLiveSent ?? true,
       });
 
@@ -683,7 +669,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         message: data.message || `Verification code dispatched to ${cleanEmail}. (Code: ${data.otp || '492108'})`,
       };
     } catch (err: any) {
-      // Offline fallback
+      // Offline fallback buffer
       setPendingSignup({
         full_name: cleanName,
         email: cleanEmail,
@@ -707,7 +693,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     otpCode: string
   ): Promise<{ success: boolean; message: string }> => {
     if (!pendingSignup) {
-      return { success: false, message: 'No active verification session found.' };
+      return { success: false, message: 'No active verification session found. Please register first.' };
     }
 
     const trimmed = otpCode.trim();
