@@ -76,14 +76,14 @@ export default function BroadcastBanner() {
 
   return (
     <>
-      <div className="w-full bg-[#070e1c]/90 backdrop-blur-md border-b border-slate-800/80 text-xs px-4 py-2 flex items-center justify-between gap-3 shadow-md z-30 transition-colors duration-200">
+      <div className="w-full bg-white/95 dark:bg-[#070e1c]/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/80 text-xs px-4 py-2 flex items-center justify-between gap-3 shadow-xs dark:shadow-md z-30 transition-colors duration-200">
         <div
           onClick={() => setIsAllModalOpen(true)}
           className="flex items-center gap-2.5 overflow-hidden flex-1 cursor-pointer group"
           title="Click to view all regional emergency broadcasts"
         >
-          <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-950/80 border border-red-500/50 text-red-400 font-mono font-bold text-[10px] shrink-0 animate-pulse shadow-sm shadow-red-500/20">
-            <Radio className="w-3 h-3 text-red-400" />
+          <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-100 dark:bg-red-950/80 border border-red-300 dark:border-red-500/50 text-red-700 dark:text-red-400 font-mono font-bold text-[10px] shrink-0 animate-pulse shadow-sm shadow-red-500/20">
+            <Radio className="w-3 h-3 text-red-600 dark:text-red-400" />
             <span>CORRIDOR ALERT</span>
           </div>
 
@@ -98,18 +98,18 @@ export default function BroadcastBanner() {
               >
                 {current.severity}
               </span>
-              <span className="font-bold text-slate-100 truncate group-hover:text-cyan-400 transition">
+              <span className="font-bold text-slate-900 dark:text-slate-100 truncate group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition">
                 {current.title}:
               </span>
-              <span className="text-slate-300 truncate hidden sm:inline">
+              <span className="text-slate-600 dark:text-slate-300 truncate hidden sm:inline">
                 {current.message}
               </span>
-              <span className="text-[11px] text-cyan-400 shrink-0 hidden md:inline font-mono">
+              <span className="text-[11px] text-cyan-700 dark:text-cyan-400 shrink-0 hidden md:inline font-mono">
                 [{current.agency}]
               </span>
             </div>
           ) : (
-            <span className="text-slate-400 italic">
+            <span className="text-slate-500 dark:text-slate-400 italic">
               No active regional hazard advisories at this time.
             </span>
           )}
@@ -120,10 +120,10 @@ export default function BroadcastBanner() {
           <button
             type="button"
             onClick={() => setIsAllModalOpen(true)}
-            className="flex items-center gap-1 px-3 py-1 rounded-xl text-[11px] font-mono font-semibold bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-cyan-800/50 transition-all shadow-sm"
+            className="flex items-center gap-1 px-3 py-1 rounded-xl text-[11px] font-mono font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-cyan-700 dark:text-cyan-300 border border-slate-200 dark:border-cyan-800/50 transition-all shadow-sm"
             title="View all active broadcasts bulletin"
           >
-            <Megaphone className="w-3 h-3 text-cyan-400" />
+            <Megaphone className="w-3 h-3 text-cyan-600 dark:text-cyan-400" />
             <span>Bulletin ({broadcasts.length})</span>
           </button>
 
@@ -144,7 +144,7 @@ export default function BroadcastBanner() {
                   type="button"
                   onClick={() => handleDeleteBroadcast(current.id)}
                   disabled={isDeleting}
-                  className="p-1 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-950/60 transition border border-red-800/50"
+                  className="p-1 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/60 transition border border-red-200 dark:border-red-800/50"
                   title="Resolve & Permanently Delete Broadcast (Official Command)"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -157,7 +157,7 @@ export default function BroadcastBanner() {
             <button
               type="button"
               onClick={() => setDismissedIds((prev) => [...prev, current.id])}
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition"
+              className="p-1 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-200 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition"
               title="Dismiss for this session"
             >
               <X className="w-3.5 h-3.5" />

@@ -869,6 +869,7 @@ export default function MapClient({
 
         {/* High-Definition Theme CartoDB Tile Layer */}
         <TileLayer
+          key={tileUrl}
           attribution='&copy; <a href="https://carto.com/">CARTO</a> | OSM Contributors'
           url={tileUrl}
           maxZoom={19}
