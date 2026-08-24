@@ -47,6 +47,7 @@ interface RoutePlannerProps {
   userLocation?: [number, number] | null;
   isTracking?: boolean;
   isNavigating?: boolean;
+  isGpsEnabled?: boolean;
   onSetOrigin: (hub: SupplyHub | null) => void;
   onSetDestination: (hub: SupplyHub | null) => void;
   onSetCargoTier: (tier: CargoTier) => void;
@@ -58,6 +59,7 @@ interface RoutePlannerProps {
   onUseCurrentLocation?: () => void;
   onStartNavigation?: () => void;
   onStopNavigation?: () => void;
+  onToggleGps?: () => void;
 }
 
 export default function RoutePlanner({
@@ -71,6 +73,7 @@ export default function RoutePlanner({
   userLocation,
   isTracking,
   isNavigating,
+  isGpsEnabled = false,
   onSetOrigin,
   onSetDestination,
   onSetCargoTier,
@@ -82,6 +85,7 @@ export default function RoutePlanner({
   onUseCurrentLocation,
   onStartNavigation,
   onStopNavigation,
+  onToggleGps,
 }: RoutePlannerProps) {
   const [loading, setLoading] = useState(false);
   const [showSteps, setShowSteps] = useState(false);
@@ -225,29 +229,48 @@ export default function RoutePlanner({
 
       {/* Select Hubs Form */}
       <div className="space-y-2.5">
-        {/* Origin Hub Selector with Live GPS Quick-Toggle */}
+        {/* Origin Hub Selector with Dynamic GPS Privacy Switch */}
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
               Origin Strategic Hub:
             </label>
-            {onUseCurrentLocation && (
-              <button
-                type="button"
-                onClick={onUseCurrentLocation}
-                className={`text-[10px] px-2 py-0.5 rounded flex items-center gap-1 font-semibold transition border ${
-                  originHub?.id === 'current-location' || isTracking
-                    ? 'bg-cyan-50 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-300 border-cyan-300 dark:border-cyan-700'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'
-                }`}
-                title="Use Live GPS Coordinates as Route Origin"
-              >
-                <LocateFixed className="w-3 h-3 text-cyan-500" />
-                <span>
-                  {originHub?.id === 'current-location' ? '📍 GPS Origin Active' : 'Use Current Location'}
-                </span>
-              </button>
-            )}
+            <div className="flex items-center gap-1.5">
+              {onToggleGps && (
+                <button
+                  type="button"
+                  onClick={onToggleGps}
+                  className={`text-[10px] px-2 py-0.5 rounded flex items-center gap-1 font-bold transition border ${
+                    isGpsEnabled
+                      ? 'bg-emerald-500/15 border-emerald-500/60 text-emerald-700 dark:text-emerald-300'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                  title={
+                    isGpsEnabled
+                      ? 'Live GPS Active (Click to Pause Tracking)'
+                      : 'Click to Connect Live GPS'
+                  }
+                >
+                  <LocateFixed
+                    className={`w-3 h-3 ${
+                      isGpsEnabled ? 'text-emerald-500 animate-pulse' : 'text-slate-400'
+                    }`}
+                  />
+                  <span>{isGpsEnabled ? 'GPS: Connected' : 'GPS: Paused'}</span>
+                </button>
+              )}
+
+              {onUseCurrentLocation && !isGpsEnabled && (
+                <button
+                  type="button"
+                  onClick={onUseCurrentLocation}
+                  className="text-[10px] px-2 py-0.5 rounded flex items-center gap-1 font-semibold transition border bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700"
+                  title="Activate GPS and set as origin"
+                >
+                  <span>Use Live Location</span>
+                </button>
+              )}
+            </div>
           </div>
           <select
             value={originHub?.id || ''}
@@ -262,10 +285,10 @@ export default function RoutePlanner({
             }}
             className="w-full bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs rounded-lg px-3 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none font-medium"
           >
-            <option value="">-- Select Origin Hub --</option>
-            {userLocation && (
+            <option value="">-- Select Origin Hub (Manual) --</option>
+            {isGpsEnabled && userLocation && (
               <option value="current-location">
-                📍 My Current Location (GPS: {userLocation[0].toFixed(3)}°, {userLocation[1].toFixed(3)}°)
+                📍 My Current Location (Live GPS: {userLocation[0].toFixed(3)}°, {userLocation[1].toFixed(3)}°)
               </option>
             )}
             {hubs.map((hub) => (

@@ -23,6 +23,7 @@ interface LogisticsMapProps {
   showBuffers?: boolean;
   isSimulatingHazard?: boolean;
   // Live GPS Tracking Props
+  isGpsEnabled?: boolean;
   userLocation?: [number, number] | null;
   accuracy?: number;
   heading?: number | null;

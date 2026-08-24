@@ -245,6 +245,7 @@ interface MapClientProps {
   showBuffers?: boolean;
   isSimulatingHazard?: boolean;
   // Live GPS Tracking Props
+  isGpsEnabled?: boolean;
   userLocation?: [number, number] | null;
   accuracy?: number;
   heading?: number | null;
@@ -279,6 +280,7 @@ export default function MapClient({
   showHubs = true,
   showBuffers = true,
   isSimulatingHazard = false,
+  isGpsEnabled = false,
   userLocation,
   accuracy = 15,
   heading,
@@ -761,10 +763,12 @@ export default function MapClient({
           followMode={followMode}
         />
 
-        <MapRecenterControl
-          userLocation={userLocation}
-          onRecenter={onToggleFollowMode}
-        />
+        {isGpsEnabled && userLocation && (
+          <MapRecenterControl
+            userLocation={userLocation}
+            onRecenter={onToggleFollowMode}
+          />
+        )}
 
         <MapSimulationClickHandler
           isSimulating={isSimulatingHazard}
@@ -1181,7 +1185,7 @@ export default function MapClient({
           </Marker>
         ))}
         {/* 7. Live GPS User / Commercial Convoy Marker */}
-        {userLocation && !isNaN(userLocation[0]) && !isNaN(userLocation[1]) && (
+        {isGpsEnabled && userLocation && !isNaN(userLocation[0]) && !isNaN(userLocation[1]) && (
           <>
             <Circle
               center={userLocation}

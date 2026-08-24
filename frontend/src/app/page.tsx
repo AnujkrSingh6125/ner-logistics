@@ -33,7 +33,7 @@ import {
 } from '@/types';
 import { calculateRoute } from '@/lib/api';
 import { recommendAlternateHubs } from '@/lib/spatial';
-import { useLiveTracking } from '@/hooks/useLiveTracking';
+import { useUserLocationManager } from '@/hooks/useUserLocationManager';
 import { ThreatAlertData } from '@/components/Navigation/LiveNavigationHUD';
 import * as turf from '@turf/turf';
 import {
@@ -49,7 +49,7 @@ import {
 
 export default function DashboardPage() {
   const { user, isGovOfficial, openAuthModal } = useAuth();
-  const tracking = useLiveTracking();
+  const gps = useUserLocationManager();
 
   // Pre-seed state with baseline data for instant hydration & 100% offline resilience
   const [hubs, setHubs] = useState<SupplyHub[]>(BASELINE_SUPPLY_HUBS);
@@ -365,11 +365,35 @@ export default function DashboardPage() {
     });
   };
 
+  // Dynamic GPS Privacy Toggle Handler
+  const handleToggleGps = useCallback(() => {
+    if (gps.isGpsEnabled) {
+      gps.disableGpsTracking();
+      if (originHub?.id === 'current-location') {
+        setOriginHub(BASELINE_SUPPLY_HUBS[0]);
+      }
+    } else {
+      gps.enableGpsTracking();
+      const lat = gps.userCoordinates ? gps.userCoordinates[0] : 26.1445;
+      const lng = gps.userCoordinates ? gps.userCoordinates[1] : 91.7362;
+      setOriginHub({
+        id: 'current-location',
+        name: 'My Current Location (Live GPS)',
+        state: 'Live GPS',
+        latitude: lat,
+        longitude: lng,
+        capacity_tonnes: 0,
+      });
+    }
+  }, [gps, originHub]);
+
   // Use Current Location Handler
   const handleUseCurrentLocation = useCallback(() => {
-    tracking.startTracking();
-    const lat = tracking.userLocation ? tracking.userLocation[0] : 26.1445;
-    const lng = tracking.userLocation ? tracking.userLocation[1] : 91.7362;
+    if (!gps.isGpsEnabled) {
+      gps.enableGpsTracking();
+    }
+    const lat = gps.userCoordinates ? gps.userCoordinates[0] : 26.1445;
+    const lng = gps.userCoordinates ? gps.userCoordinates[1] : 91.7362;
     setOriginHub({
       id: 'current-location',
       name: 'My Current Location (Live GPS)',
@@ -378,15 +402,15 @@ export default function DashboardPage() {
       longitude: lng,
       capacity_tonnes: 0,
     });
-  }, [tracking]);
+  }, [gps]);
 
   // Real-Time Off-Route Deviation & Forward Threat Detection while En Route
   useEffect(() => {
-    if (!tracking.userLocation) return;
-    const [userLat, userLng] = tracking.userLocation;
+    if (!gps.userCoordinates || !gps.isGpsEnabled) return;
+    const [userLat, userLng] = gps.userCoordinates;
 
     // 1. Off-Route Deviation Recalculation (> 120m from active path)
-    if (tracking.isNavigating && destHub && routeData) {
+    if (gps.isNavigating && destHub && routeData) {
       const activeCoords =
         routeData.candidateRoutes?.[selectedRouteIndex]?.geometry?.coordinates ||
         routeData.primaryRoute?.geometry?.coordinates;
@@ -427,7 +451,7 @@ export default function DashboardPage() {
     }
 
     // 2. Real-Time Forward Hazard Interception
-    if (tracking.isNavigating && disruptions.length > 0) {
+    if (gps.isNavigating && disruptions.length > 0) {
       let closestThreat: ThreatAlertData | null = null;
       const userPt = turf.point([userLng, userLat]);
 
@@ -452,8 +476,9 @@ export default function DashboardPage() {
       setThreatAlert(closestThreat);
     }
   }, [
-    tracking.userLocation,
-    tracking.isNavigating,
+    gps.userCoordinates,
+    gps.isGpsEnabled,
+    gps.isNavigating,
     destHub,
     originHub,
     routeData,
@@ -470,8 +495,8 @@ export default function DashboardPage() {
     }
 
     if (!routeData && originHub) {
-      const startLat = tracking.userLocation ? tracking.userLocation[0] : originHub.latitude;
-      const startLng = tracking.userLocation ? tracking.userLocation[1] : originHub.longitude;
+      const startLat = gps.userCoordinates ? gps.userCoordinates[0] : originHub.latitude;
+      const startLng = gps.userCoordinates ? gps.userCoordinates[1] : originHub.longitude;
       const fresh = await calculateRoute(
         startLat,
         startLng,
@@ -485,20 +510,20 @@ export default function DashboardPage() {
       setRouteData(fresh);
     }
 
-    tracking.startNavigation();
+    gps.startNavigation();
   };
 
   // Toggle Convoy Motion Simulator
   const handleToggleSimulation = () => {
-    if (tracking.isSimulated) {
-      tracking.stopTracking();
+    if (gps.isSimulated) {
+      gps.disableGpsTracking();
     } else {
       const activeCoords =
         routeData?.candidateRoutes?.[selectedRouteIndex]?.geometry?.coordinates ||
         routeData?.primaryRoute?.geometry?.coordinates;
 
       if (activeCoords && activeCoords.length >= 2) {
-        tracking.startSimulation(activeCoords as [number, number][], 65);
+        gps.startSimulation(activeCoords as [number, number][], 65);
       } else {
         alert('Please calculate a corridor route before launching simulated vehicle motion.');
       }
@@ -511,8 +536,8 @@ export default function DashboardPage() {
       setActiveRouteView('DETOUR');
       setThreatAlert(null);
     } else if (originHub && destHub) {
-      const startLat = tracking.userLocation ? tracking.userLocation[0] : originHub.latitude;
-      const startLng = tracking.userLocation ? tracking.userLocation[1] : originHub.longitude;
+      const startLat = gps.userCoordinates ? gps.userCoordinates[0] : originHub.latitude;
+      const startLng = gps.userCoordinates ? gps.userCoordinates[1] : originHub.longitude;
       const fresh = await calculateRoute(
         startLat,
         startLng,
@@ -530,7 +555,14 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen lg:h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200 lg:overflow-hidden">
+    <div className="min-h-screen lg:h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200 lg:overflow-hidden relative">
+      {/* GPS Status Toast Notice */}
+      {gps.statusMessage && (
+        <div className="fixed top-16 right-4 z-[9999] bg-slate-900/95 text-slate-100 border border-slate-700 px-3.5 py-2 rounded-xl shadow-2xl backdrop-blur text-xs font-semibold animate-in fade-in slide-in-from-top-2 duration-300 flex items-center gap-2">
+          <span>{gps.statusMessage}</span>
+        </div>
+      )}
+
       <div className="shrink-0">
         <Header
           isSimulatingHazard={isSimulatingHazard}
@@ -544,6 +576,8 @@ export default function DashboardPage() {
           onResetSimulation={handleResetSimulation}
           onRefresh={loadData}
           isRefreshing={isRefreshing}
+          isGpsEnabled={gps.isGpsEnabled}
+          onToggleGps={handleToggleGps}
         />
         <BroadcastBanner />
       </div>
@@ -575,7 +609,7 @@ export default function DashboardPage() {
                     Hazard Simulation Active
                   </span>
                 )}
-                {tracking.isNavigating && (
+                {gps.isNavigating && (
                   <span className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 px-2 py-0.5 rounded-full font-mono flex items-center gap-1 font-bold animate-pulse">
                     <Navigation className="w-2.5 h-2.5" />
                     GPS Navigation Active
@@ -642,22 +676,23 @@ export default function DashboardPage() {
                 showDisruptions={showDisruptions}
                 showBuffers={showBuffers}
                 isSimulatingHazard={isSimulatingHazard && isGovOfficial}
-                userLocation={tracking.userLocation}
-                accuracy={tracking.accuracy}
-                heading={tracking.heading}
-                speed={tracking.speed}
-                isTracking={tracking.isTracking}
-                isNavigating={tracking.isNavigating}
-                followMode={tracking.followMode}
-                isSimulated={tracking.isSimulated}
+                isGpsEnabled={gps.isGpsEnabled}
+                userLocation={gps.userCoordinates}
+                accuracy={gps.accuracy}
+                heading={gps.heading}
+                speed={gps.speed}
+                isTracking={gps.isGpsEnabled}
+                isNavigating={gps.isNavigating}
+                followMode={gps.followMode}
+                isSimulated={gps.isSimulated}
                 threatAlert={threatAlert}
                 onSelectHub={(hub) => setSelectedHub(hub)}
                 onSetOrigin={(hub) => setOriginHub(hub)}
                 onSetDestination={(hub) => setDestHub(hub)}
                 onSelectCandidateRoute={handleSelectCandidateRoute}
                 onMapClickSimulate={handleMapClickSimulate}
-                onToggleFollowMode={tracking.toggleFollowMode}
-                onExitNavigation={tracking.stopNavigation}
+                onToggleFollowMode={gps.toggleFollowMode}
+                onExitNavigation={gps.stopNavigation}
                 onAcceptDetour={handleAcceptDetour}
                 onDismissThreatAlert={() => setThreatAlert(null)}
                 onToggleSimulation={handleToggleSimulation}
@@ -685,9 +720,10 @@ export default function DashboardPage() {
               activeRouteView={activeRouteView}
               cargoTier={cargoTier}
               selectedRouteIndex={selectedRouteIndex}
-              userLocation={tracking.userLocation}
-              isTracking={tracking.isTracking}
-              isNavigating={tracking.isNavigating}
+              isGpsEnabled={gps.isGpsEnabled}
+              userLocation={gps.userCoordinates}
+              isTracking={gps.isGpsEnabled}
+              isNavigating={gps.isNavigating}
               onSetOrigin={setOriginHub}
               onSetDestination={setDestHub}
               onSetCargoTier={setCargoTier}
@@ -705,7 +741,8 @@ export default function DashboardPage() {
               onClear={handleClear}
               onUseCurrentLocation={handleUseCurrentLocation}
               onStartNavigation={handleStartNavigation}
-              onStopNavigation={tracking.stopNavigation}
+              onStopNavigation={gps.stopNavigation}
+              onToggleGps={handleToggleGps}
             />
 
             <DisruptionAlerts
