@@ -310,6 +310,46 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     }
   }, [startBrowserWatch]);
 
+  // 🛰️ Real-Time Telemetry Auto-Sync to Supabase & Backend for Active Citizen Users
+  const lastSyncedCoordsRef = useRef<[number, number] | null>(null);
+  const lastSyncTimeRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (!userCoordinates || !user) return;
+    const [lat, lng] = userCoordinates;
+    if (isNaN(lat) || isNaN(lng)) return;
+
+    const now = Date.now();
+    const prev = lastSyncedCoordsRef.current;
+    
+    // Sync on initial GPS acquisition or every 3 seconds
+    const timeDiff = now - lastSyncTimeRef.current;
+    const shouldSync = !prev || timeDiff > 3000;
+
+    if (shouldSync) {
+      lastSyncedCoordsRef.current = [lat, lng];
+      lastSyncTimeRef.current = now;
+
+      const payload = {
+        client_id: user.id,
+        citizen_uid: user.citizen_uid || `NER-CIT-${user.id.slice(0, 5)}`,
+        driver_name: user.full_name || 'Citizen Driver',
+        current_lat: lat,
+        current_lng: lng,
+        speed_kmh: speed || 0,
+        heading: heading || 0,
+        is_active: true,
+        shared_with: 'ALL',
+      };
+
+      fetch('/api/telemetry/journey', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch((err) => console.warn('[LocationContext Telemetry Sync Notice]:', err));
+    }
+  }, [userCoordinates, speed, heading, user]);
+
   useEffect(() => {
     return () => {
       if (watchIdRef.current !== null && typeof window !== 'undefined') {

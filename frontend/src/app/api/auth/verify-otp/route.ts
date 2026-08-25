@@ -68,6 +68,24 @@ export async function POST(request: NextRequest) {
     const citizenUid = supaUser?.user_metadata?.citizen_uid || `NER-CIT-${Math.floor(10000 + Math.random() * 90000)}`;
     const userRole = supaUser?.user_metadata?.role || 'CITIZEN_DRIVER';
 
+    const reqLat =
+      body.current_lat !== undefined
+        ? Number(body.current_lat)
+        : body.coords?.lat !== undefined
+        ? Number(body.coords.lat)
+        : supaUser?.user_metadata?.current_lat !== undefined
+        ? Number(supaUser.user_metadata.current_lat)
+        : 26.1445;
+
+    const reqLng =
+      body.current_lng !== undefined
+        ? Number(body.current_lng)
+        : body.coords?.lng !== undefined
+        ? Number(body.coords.lng)
+        : supaUser?.user_metadata?.current_lng !== undefined
+        ? Number(supaUser.user_metadata.current_lng)
+        : 91.7362;
+
     const userProfile: UserProfile = {
       id: supaUser?.id || `citizen-${Date.now()}`,
       citizen_uid: citizenUid,
@@ -78,8 +96,8 @@ export async function POST(request: NextRequest) {
       state: 'Assam',
       is_verified: true,
       is_sharing_location: true,
-      current_lat: 26.1445,
-      current_lng: 91.7362,
+      current_lat: reqLat,
+      current_lng: reqLng,
       created_at: new Date().toISOString(),
     };
 
@@ -95,8 +113,8 @@ export async function POST(request: NextRequest) {
               email: userProfile.email,
               phone: userProfile.phone,
               is_sharing_location: true,
-              current_lat: 26.1445,
-              current_lng: 91.7362,
+              current_lat: reqLat,
+              current_lng: reqLng,
               last_location_update: new Date().toISOString(),
             },
             { onConflict: 'email' }

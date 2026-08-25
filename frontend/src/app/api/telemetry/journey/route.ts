@@ -95,16 +95,18 @@ export async function POST(request: NextRequest) {
         }
 
         // Also update last known position in client_users table
+        const updatePayload = {
+          current_lat: journey.current_lat,
+          current_lng: journey.current_lng,
+          is_sharing_location: true,
+          last_location_update: new Date().toISOString(),
+        };
+
         if (citizen_uid) {
-          await supabase
-            .from('client_users')
-            .update({
-              current_lat: journey.current_lat,
-              current_lng: journey.current_lng,
-              is_sharing_location: true,
-              last_location_update: new Date().toISOString(),
-            })
-            .eq('citizen_uid', citizen_uid);
+          await supabase.from('client_users').update(updatePayload).ilike('citizen_uid', citizen_uid);
+        }
+        if (client_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(client_id)) {
+          await supabase.from('client_users').update(updatePayload).eq('id', client_id);
         }
       } catch (err) {
         console.warn('Supabase live_journeys upsert notice:', err);
