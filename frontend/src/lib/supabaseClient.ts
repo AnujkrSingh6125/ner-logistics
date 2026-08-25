@@ -848,12 +848,25 @@ export const normalizeShipment = (item: any): Shipment => {
   const destLat = Number(item.destination_lat) || (typeof item.destination === 'object' && Number(item.destination?.latitude)) || 25.5788;
   const destLng = Number(item.destination_lng) || (typeof item.destination === 'object' && Number(item.destination?.longitude)) || 91.8933;
 
-  const originName = item.origin_name || (typeof item.origin === 'string' ? item.origin : item.origin?.name) || 'Guwahati Regional Hub';
-  const destName = item.destination_name || (typeof item.destination === 'string' ? item.destination : item.destination?.name) || 'Shillong Forward Terminal';
+  const originName =
+    item.origin_name ||
+    item.origin_hub ||
+    (typeof item.origin === 'string' ? item.origin : item.origin?.name) ||
+    'Guwahati Central Hub';
+  const destName =
+    item.destination_name ||
+    item.destination_hub ||
+    (typeof item.destination === 'string' ? item.destination : item.destination?.name) ||
+    'Silchar Logistics Depot';
+
+  const trackingCode =
+    item.tracking_code ||
+    item.tracking_number ||
+    `NER-SHP-${item.id ? String(item.id).slice(0, 4).toUpperCase() : Math.floor(1000 + Math.random() * 9000)}`;
 
   return {
     id: item.id ? String(item.id) : `shp-${Date.now()}`,
-    tracking_code: item.tracking_code || `NER-SHP-${item.id ? String(item.id).slice(0, 4).toUpperCase() : Math.floor(1000 + Math.random() * 9000)}`,
+    tracking_code: trackingCode,
     driver_id: item.driver_id || 'NER-CIT-UNASSIGNED',
     driver_name: item.driver_name || 'Driver In Transit',
     origin_hub_id: isValidUUID(item.origin_hub_id) ? item.origin_hub_id : undefined,
@@ -874,7 +887,7 @@ export const normalizeShipment = (item: any): Shipment => {
     cargo_tier: item.cargo_tier || 'TIER_1_CRITICAL',
     cargo_manifest: item.cargo_manifest || 'Essential Logistics Consignment',
     priority_level: Number(item.priority_level) || 4,
-    weight_tonnes: Number(item.weight_tonnes) || 5,
+    weight_tonnes: Number(item.weight_tonnes) || Number(item.weight_tons) || 5,
     current_status: item.current_status || item.status || 'IN_TRANSIT',
     current_lat: Number(item.current_lat) || originLat,
     current_lng: Number(item.current_lng) || originLng,
@@ -969,17 +982,21 @@ export async function insertShipment(
   if (supabase) {
     try {
       const payload: Record<string, any> = {
+        tracking_number: newShipment.tracking_code,
         tracking_code: newShipment.tracking_code,
         driver_id: newShipment.driver_id,
         driver_name: newShipment.driver_name,
+        origin_hub: newShipment.origin_name,
         origin_name: newShipment.origin_name,
-        destination_name: newShipment.destination_name,
         origin: newShipment.origin_name,
+        destination_hub: newShipment.destination_name,
+        destination_name: newShipment.destination_name,
         destination: newShipment.destination_name,
         cargo_type: newShipment.cargo_type,
         cargo_tier: newShipment.cargo_tier,
         cargo_manifest: newShipment.cargo_manifest,
         priority_level: newShipment.priority_level,
+        weight_tons: newShipment.weight_tonnes,
         weight_tonnes: newShipment.weight_tonnes,
         current_status: 'IN_TRANSIT',
         status: 'IN_TRANSIT',
@@ -987,6 +1004,7 @@ export async function insertShipment(
         current_lng: originLng,
         heading: 0,
         speed: 45,
+        speed_kmh: 45,
         threat_score: 0,
         dispatched_by_hub_id: newShipment.dispatched_by_hub_id || null,
         hub_id: newShipment.hub_id || newShipment.dispatched_by_hub_id || null,
@@ -1011,7 +1029,7 @@ export async function insertShipment(
         .single();
 
       if (!error && data) {
-        console.log('[SUPABASE DISPATCH PERSISTED TO POSTGRESQL]:', data.id, data.tracking_code);
+        console.log('[SUPABASE DISPATCH PERSISTED TO POSTGRESQL]:', data.id, data.tracking_code || data.tracking_number);
         newShipment = normalizeShipment(data);
       } else if (error) {
         console.error('[SUPABASE DISPATCH PERSISTENCE ERROR]:', error.message, error.details || error);

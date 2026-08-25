@@ -19,6 +19,7 @@ import {
   DisasterResilientRouteResponse,
   LiveJourney,
   Shipment,
+  TrackedCitizenTelemetry,
 } from '@/types';
 import { BASELINE_SUPPLY_HUBS, BASELINE_DISRUPTIONS } from '@/lib/supabaseClient';
 import { useTheme } from '@/context/ThemeContext';
@@ -313,6 +314,7 @@ function MapController({
   isNavigating,
   followMode,
   trackedShipment,
+  trackedCitizenLocation,
 }: {
   center: [number, number];
   zoom: number;
@@ -321,11 +323,26 @@ function MapController({
   isNavigating?: boolean;
   followMode?: boolean;
   trackedShipment?: Shipment | null;
+  trackedCitizenLocation?: TrackedCitizenTelemetry | null;
 }) {
   const map = useMap();
 
   useEffect(() => {
     try {
+      if (
+        trackedCitizenLocation &&
+        trackedCitizenLocation.current_lat &&
+        trackedCitizenLocation.current_lng &&
+        !isNaN(trackedCitizenLocation.current_lat) &&
+        !isNaN(trackedCitizenLocation.current_lng)
+      ) {
+        map.flyTo([trackedCitizenLocation.current_lat, trackedCitizenLocation.current_lng], 13, {
+          animate: true,
+          duration: 1.0,
+        });
+        return;
+      }
+
       if (
         trackedShipment &&
         trackedShipment.current_lat &&
@@ -370,7 +387,7 @@ function MapController({
     } catch (err) {
       console.warn('MapController camera update warning:', err);
     }
-  }, [center, zoom, routeCoordinates, userLocation, isNavigating, followMode, trackedShipment, map]);
+  }, [center, zoom, routeCoordinates, userLocation, isNavigating, followMode, trackedShipment, trackedCitizenLocation, map]);
 
   return null;
 }
@@ -380,7 +397,7 @@ function MapSimulationClickHandler({
   isSimulating,
   onMapClick,
 }: {
-  isSimulating: boolean;
+  isSimulating?: boolean;
   onMapClick?: (coords: { latitude: number; longitude: number }) => void;
 }) {
   useMapEvents({
@@ -393,7 +410,6 @@ function MapSimulationClickHandler({
       }
     },
   });
-
   return null;
 }
 
@@ -410,6 +426,7 @@ interface MapClientProps {
   showHubs?: boolean;
   showBuffers?: boolean;
   isSimulatingHazard?: boolean;
+  // Live GPS Tracking Props
   isGpsEnabled?: boolean;
   userLocation?: [number, number] | null;
   accuracy?: number;
@@ -421,6 +438,7 @@ interface MapClientProps {
   isSimulated?: boolean;
   threatAlert?: ThreatAlertData | null;
   trackedShipment?: Shipment | null;
+  trackedCitizenLocation?: TrackedCitizenTelemetry | null;
   fleetShipments?: Shipment[];
   onSelectHub?: (hub: SupplyHub) => void;
   onSetOrigin?: (hub: SupplyHub) => void;
@@ -458,6 +476,7 @@ export default function MapClient({
   isSimulated = false,
   threatAlert,
   trackedShipment,
+  trackedCitizenLocation,
   fleetShipments,
   onSelectHub,
   onSetOrigin,
@@ -705,6 +724,39 @@ export default function MapClient({
       iconSize: [44, 44],
       iconAnchor: [22, 22],
       popupAnchor: [0, -22],
+    });
+  };
+
+  // Custom DivIcon for Targeted Citizen Live GPS Radar
+  const createTrackedCitizenIcon = (citizen: TrackedCitizenTelemetry) => {
+    const isSharing = citizen.is_sharing_location;
+    const pulseColor = isSharing ? 'rgba(34, 211, 238, 0.9)' : 'rgba(245, 158, 11, 0.9)';
+    const borderColor = isSharing ? '#22d3ee' : '#f59e0b';
+    const heading = citizen.heading || 0;
+
+    const html = `
+      <div class="relative flex items-center justify-center pointer-events-none" style="width: 48px; height: 48px;">
+        <div class="absolute w-12 h-12 rounded-full border-2 border-cyan-400/50 animate-ping" style="background: ${pulseColor}; opacity: 0.25;"></div>
+        <div class="absolute w-8 h-8 rounded-full border border-cyan-300 animate-pulse" style="background: ${pulseColor}; opacity: 0.35;"></div>
+        <div class="relative z-10 w-9 h-9 rounded-2xl flex items-center justify-center shadow-2xl border-2 pointer-events-auto"
+             style="background: #090e1a; border-color: ${borderColor}; box-shadow: 0 0 20px ${pulseColor}; transform: rotate(${heading}deg);">
+          <svg class="w-4 h-4 text-cyan-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+          </svg>
+        </div>
+        <div class="absolute -bottom-4.5 bg-cyan-950/95 text-[9px] font-mono font-bold text-cyan-200 px-2 py-0.5 rounded-full border border-cyan-500 shadow-xl whitespace-nowrap pointer-events-none flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
+          <span>${citizen.citizen_uid}</span>
+        </div>
+      </div>
+    `;
+
+    return L.divIcon({
+      html,
+      className: 'custom-tracked-citizen-radar-icon',
+      iconSize: [48, 48],
+      iconAnchor: [24, 24],
+      popupAnchor: [0, -24],
     });
   };
 
@@ -967,6 +1019,7 @@ export default function MapClient({
           isNavigating={isNavigating}
           followMode={followMode}
           trackedShipment={trackedShipment}
+          trackedCitizenLocation={trackedCitizenLocation}
         />
 
         {/* Unified Vertical Left Floating Glass Toolbar */}
@@ -1338,6 +1391,66 @@ export default function MapClient({
             </Marker>
           </>
         )}
+
+        {/* 7. On-Demand Target Citizen Live GPS Radar Marker */}
+        {trackedCitizenLocation &&
+          trackedCitizenLocation.current_lat &&
+          trackedCitizenLocation.current_lng &&
+          !isNaN(trackedCitizenLocation.current_lat) &&
+          !isNaN(trackedCitizenLocation.current_lng) && (
+            <>
+              <Circle
+                center={[trackedCitizenLocation.current_lat, trackedCitizenLocation.current_lng]}
+                radius={600}
+                pathOptions={{
+                  color: '#22d3ee',
+                  fillColor: '#06b6d4',
+                  fillOpacity: 0.2,
+                  weight: 2,
+                  dashArray: '4, 6',
+                }}
+              />
+              <Marker
+                position={[trackedCitizenLocation.current_lat, trackedCitizenLocation.current_lng]}
+                icon={createTrackedCitizenIcon(trackedCitizenLocation)}
+                zIndexOffset={4000}
+              >
+                <Popup>
+                  <div className="p-2 text-xs text-slate-100 min-w-[210px] space-y-1.5 bg-slate-900 rounded-lg">
+                    <div className="flex items-center justify-between border-b border-slate-700 pb-1">
+                      <span className="font-mono font-bold text-cyan-400">
+                        {trackedCitizenLocation.citizen_uid}
+                      </span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-700 animate-pulse">
+                        TARGET ACQUIRED
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-200 font-bold">
+                      👤 {trackedCitizenLocation.full_name}
+                    </div>
+                    {trackedCitizenLocation.phone && (
+                      <div className="text-[10px] text-slate-400 font-mono">
+                        📞 {trackedCitizenLocation.phone}
+                      </div>
+                    )}
+                    <div className="text-[10px] text-slate-300">
+                      <div>
+                        📍 {trackedCitizenLocation.current_lat.toFixed(4)}° N, {trackedCitizenLocation.current_lng.toFixed(4)}° E
+                      </div>
+                      <div className="text-teal-400 font-mono pt-0.5">
+                        Speed: {Math.round(trackedCitizenLocation.speed_kmh || 0)} km/h • Heading: {Math.round(trackedCitizenLocation.heading || 0)}°
+                      </div>
+                      {(trackedCitizenLocation.origin_hub || trackedCitizenLocation.destination_hub) && (
+                        <div className="text-slate-400 pt-0.5 italic">
+                          🛣️ {trackedCitizenLocation.origin_hub || 'Hub'} → {trackedCitizenLocation.destination_hub || 'Destination'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
+            </>
+          )}
       </MapContainer>
 
       {/* Live Turn-by-Turn Navigation HUD Overlay */}

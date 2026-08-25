@@ -33,6 +33,7 @@ import {
   SimulatedHazardInput,
   CargoTier,
   HubRecommendation,
+  TrackedCitizenTelemetry,
 } from '@/types';
 import { calculateRoute } from '@/lib/api';
 import { recommendAlternateHubs } from '@/lib/spatial';
@@ -73,6 +74,7 @@ export default function DashboardPage() {
   } = useRealtimeTelemetry();
 
   const [trackedShipment, setTrackedShipment] = useState<Shipment | null>(null);
+  const [trackedCitizen, setTrackedCitizen] = useState<TrackedCitizenTelemetry | null>(null);
 
   // Automatically track first active shipment once loaded
   useEffect(() => {
@@ -835,6 +837,7 @@ export default function DashboardPage() {
                 isSimulated={gps.isSimulated}
                 threatAlert={threatAlert}
                 trackedShipment={trackedShipment}
+                trackedCitizenLocation={trackedCitizen}
                 fleetShipments={shipments}
                 onSelectHub={(hub) => setSelectedHub(hub)}
                 onSetOrigin={(hub) => setOriginHub(hub)}
@@ -961,6 +964,8 @@ export default function DashboardPage() {
                   setMobileTab('map');
                 }}
                 onDeleteShipment={handleDeleteShipment}
+                onTrackedCitizenChange={setTrackedCitizen}
+                trackedCitizen={trackedCitizen}
               />
             </div>
           </div>

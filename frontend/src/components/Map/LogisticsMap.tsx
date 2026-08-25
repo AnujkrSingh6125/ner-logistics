@@ -7,6 +7,7 @@ import {
   RoadDisruption,
   DisasterResilientRouteResponse,
   Shipment,
+  TrackedCitizenTelemetry,
 } from '@/types';
 import { ThreatAlertData } from '@/components/Navigation/LiveNavigationHUD';
 
@@ -35,6 +36,7 @@ interface LogisticsMapProps {
   isSimulated?: boolean;
   threatAlert?: ThreatAlertData | null;
   trackedShipment?: Shipment | null;
+  trackedCitizenLocation?: TrackedCitizenTelemetry | null;
   fleetShipments?: Shipment[];
   onSelectHub?: (hub: SupplyHub) => void;
   onSetOrigin?: (hub: SupplyHub) => void;

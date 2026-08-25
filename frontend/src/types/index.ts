@@ -67,6 +67,24 @@ export interface LiveJourney {
   updated_at?: string;
 }
 
+export interface TrackedCitizenTelemetry {
+  id: string;
+  citizen_uid: string;
+  full_name: string;
+  email?: string | null;
+  phone?: string | null;
+  role?: string;
+  is_sharing_location: boolean;
+  current_lat: number;
+  current_lng: number;
+  speed_kmh: number;
+  heading: number;
+  origin_hub?: string | null;
+  destination_hub?: string | null;
+  is_active_journey?: boolean;
+  last_location_update?: string;
+}
+
 export type BroadcastSeverity = 'INFO' | 'WARNING' | 'CRITICAL' | 'EMERGENCY';
 
 export interface SystemBroadcast {

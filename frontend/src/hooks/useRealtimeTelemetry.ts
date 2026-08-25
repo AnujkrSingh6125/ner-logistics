@@ -1,7 +1,5 @@
-'use client';
-
 import { useState, useEffect, useCallback } from 'react';
-import { supabase, BASELINE_SUPPLY_HUBS, BASELINE_DISRUPTIONS } from '@/lib/supabaseClient';
+import { supabase, BASELINE_SUPPLY_HUBS, BASELINE_DISRUPTIONS, normalizeShipment } from '@/lib/supabaseClient';
 import { SupplyHub, RoadDisruption, Shipment } from '@/types';
 
 export function useRealtimeTelemetry() {
@@ -31,7 +29,7 @@ export function useRealtimeTelemetry() {
         setDisruptions(disruptionsRes.data as RoadDisruption[]);
       }
       if (shipmentsRes.data && shipmentsRes.data.length > 0) {
-        setShipments(shipmentsRes.data as Shipment[]);
+        setShipments(shipmentsRes.data.map(normalizeShipment));
       }
     } catch (err) {
       console.warn('[useRealtimeTelemetry] Initial fetch fallback active:', err);
@@ -143,9 +141,11 @@ export function useRealtimeTelemetry() {
           (payload: any) => {
             if (!isMounted) return;
             if (payload.eventType === 'INSERT' && payload.new) {
-              setShipments((prev) => [payload.new as Shipment, ...prev.filter((s) => s.id !== payload.new.id)]);
+              const norm = normalizeShipment(payload.new);
+              setShipments((prev) => [norm, ...prev.filter((s) => s.id !== norm.id)]);
             } else if (payload.eventType === 'UPDATE' && payload.new) {
-              setShipments((prev) => prev.map((s) => (s.id === payload.new.id ? (payload.new as Shipment) : s)));
+              const norm = normalizeShipment(payload.new);
+              setShipments((prev) => prev.map((s) => (s.id === norm.id ? norm : s)));
             } else if (payload.eventType === 'DELETE' && payload.old) {
               setShipments((prev) => prev.filter((s) => s.id !== payload.old.id));
             }

@@ -1,8 +1,7 @@
-'use client';
-
 import React, { useState } from 'react';
-import { Shipment, CargoType } from '@/types';
+import { Shipment, CargoType, TrackedCitizenTelemetry } from '@/types';
 import { useAuth } from '@/context/AuthContext';
+import ClientUserTracker from './ClientUserTracker';
 import {
   HeartPulse,
   Apple,
@@ -20,6 +19,7 @@ import {
   ShieldAlert,
   Trash2,
   Loader2,
+  Radar,
 } from 'lucide-react';
 
 interface ShipmentFeedProps {
@@ -27,6 +27,8 @@ interface ShipmentFeedProps {
   selectedShipmentId?: string | null;
   onSelectShipment?: (shipment: Shipment) => void;
   onDeleteShipment?: (shipmentId: string) => Promise<void>;
+  onTrackedCitizenChange?: (telemetry: TrackedCitizenTelemetry | null) => void;
+  trackedCitizen?: TrackedCitizenTelemetry | null;
 }
 
 export default function ShipmentFeed({
@@ -34,10 +36,13 @@ export default function ShipmentFeed({
   selectedShipmentId,
   onSelectShipment,
   onDeleteShipment,
+  onTrackedCitizenChange,
+  trackedCitizen,
 }: ShipmentFeedProps) {
   const { user, canObserveTelemetry, isSupplyHub, isGovOfficial, openAuthModal } = useAuth();
   const [unauthorizedWarning, setUnauthorizedWarning] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [feedTab, setFeedTab] = useState<'fleet' | 'radar'>('fleet');
 
   const getCargoIcon = (type: CargoType) => {
     switch (type) {
@@ -115,28 +120,55 @@ export default function ShipmentFeed({
 
   return (
     <div className="bg-white/95 dark:bg-[#070e1c]/85 backdrop-blur-xl rounded-2xl p-4 border border-slate-200 dark:border-slate-800/80 shadow-md dark:shadow-[0_4px_24px_rgba(0,0,0,0.3)] transition-colors duration-200 space-y-3.5 text-slate-900 dark:text-slate-100">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
             <Truck className="w-4 h-4" />
           </div>
           <div>
             <h2 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-              Active Convoy Fleet
+              Active Logistics & Fleet Tracking
             </h2>
             <p className="text-[10px] text-slate-500 dark:text-slate-400">
               {canObserveTelemetry
-                ? 'Live Telemetry & Driver Tracking (Authorized)'
+                ? 'Live Telemetry, Dispatches & Citizen GPS Radar'
                 : 'Convoy Manifest Overview (Telemetry Locked)'}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-800/60 px-2 py-0.5 rounded-full flex items-center gap-1">
-            <Activity className="w-3 h-3 text-emerald-600 dark:text-emerald-400 animate-pulse" />
-            {shipments.length} Active
-          </span>
-        </div>
+
+        {/* Tab Switcher (Fleet vs Radar) */}
+        {canObserveTelemetry && (
+          <div className="flex items-center bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
+            <button
+              type="button"
+              onClick={() => setFeedTab('fleet')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium transition ${
+                feedTab === 'fleet'
+                  ? 'bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Truck className="w-3.5 h-3.5" />
+              <span>Convoys ({shipments.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setFeedTab('radar')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium transition ${
+                feedTab === 'radar'
+                  ? 'bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Radar className={`w-3.5 h-3.5 ${trackedCitizen ? 'text-cyan-400 animate-spin' : ''}`} />
+              <span>Citizen Radar</span>
+              {trackedCitizen && (
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Unauthorized Access Warning Banner */}
@@ -156,12 +188,19 @@ export default function ShipmentFeed({
         </div>
       )}
 
-      <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1 custom-scrollbar">
-        {shipments.length === 0 ? (
-          <div className="p-6 text-center text-xs text-slate-400 font-mono border border-dashed border-slate-300 dark:border-slate-800 rounded-xl">
-            No active convoy shipments dispatched yet.
-          </div>
-        ) : (
+      {/* Mode View: Citizen Radar vs Convoy List */}
+      {feedTab === 'radar' && canObserveTelemetry ? (
+        <ClientUserTracker
+          onTrackedLocationChange={onTrackedCitizenChange}
+          activeTrackedUser={trackedCitizen}
+        />
+      ) : (
+        <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1 custom-scrollbar">
+          {shipments.length === 0 ? (
+            <div className="p-6 text-center text-xs text-slate-400 font-mono border border-dashed border-slate-300 dark:border-slate-800 rounded-xl">
+              No active convoy shipments dispatched yet.
+            </div>
+          ) : (
           shipments.map((s) => {
             const isSelected = selectedShipmentId === s.id;
             const userCanDelete = canDeleteShipment(s);
@@ -285,7 +324,8 @@ export default function ShipmentFeed({
             );
           })
         )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
