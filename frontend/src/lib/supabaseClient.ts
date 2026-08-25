@@ -693,6 +693,25 @@ export const FALLBACK_SHIPMENTS: Shipment[] = [];
 
 let activeShipmentsMemory: Shipment[] = [];
 
+// Normalizes Supply Hub records ensuring valid id, name, capacity, and active status
+export function normalizeSupplyHub(h: any): SupplyHub {
+  const name = h.name || h.id || 'Unnamed Strategic Hub';
+  return {
+    ...h,
+    id: (h.id || name).trim(),
+    name: name.trim(),
+    state: h.state || 'NER Region',
+    district: h.district || '',
+    latitude: Number(h.latitude) || 0,
+    longitude: Number(h.longitude) || 0,
+    capacity_tonnes: Number(h.capacity_tonnes ?? h.capacity_tons ?? 1000),
+    capacity_tons: Number(h.capacity_tons ?? h.capacity_tonnes ?? 1000),
+    current_load_tons: Number(h.current_load_tons ?? 0),
+    status: h.status || 'OPERATIONAL',
+    is_active: h.is_active !== false,
+  };
+}
+
 // Fetch Supply Hubs (Supabase with Fallback)
 export async function fetchSupplyHubs(): Promise<SupplyHub[]> {
   if (supabase) {
@@ -702,13 +721,13 @@ export async function fetchSupplyHubs(): Promise<SupplyHub[]> {
         .select('*')
         .order('state', { ascending: true });
       if (!error && data && data.length > 0) {
-        return data as SupplyHub[];
+        return data.map(normalizeSupplyHub);
       }
     } catch (err) {
       console.warn('Supabase fetch error, using regional defaults:', err);
     }
   }
-  return BASELINE_SUPPLY_HUBS;
+  return BASELINE_SUPPLY_HUBS.map(normalizeSupplyHub);
 }
 
 // Fetch Road Disruptions (Combines Supabase / Baseline + Injected Simulated Hazards)

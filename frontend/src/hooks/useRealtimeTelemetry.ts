@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase, BASELINE_SUPPLY_HUBS, BASELINE_DISRUPTIONS, normalizeShipment } from '@/lib/supabaseClient';
+import { supabase, BASELINE_SUPPLY_HUBS, BASELINE_DISRUPTIONS, normalizeShipment, normalizeSupplyHub } from '@/lib/supabaseClient';
 import { SupplyHub, RoadDisruption, Shipment } from '@/types';
 
 export function useRealtimeTelemetry() {
   const [disruptions, setDisruptions] = useState<RoadDisruption[]>(BASELINE_DISRUPTIONS);
-  const [hubs, setHubs] = useState<SupplyHub[]>(BASELINE_SUPPLY_HUBS);
+  const [hubs, setHubs] = useState<SupplyHub[]>(BASELINE_SUPPLY_HUBS.map(normalizeSupplyHub));
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -23,7 +23,7 @@ export function useRealtimeTelemetry() {
       ]);
 
       if (hubsRes.data && hubsRes.data.length > 0) {
-        setHubs(hubsRes.data as SupplyHub[]);
+        setHubs(hubsRes.data.map(normalizeSupplyHub));
       }
       if (disruptionsRes.data && disruptionsRes.data.length > 0) {
         setDisruptions(disruptionsRes.data as RoadDisruption[]);
@@ -57,9 +57,11 @@ export function useRealtimeTelemetry() {
           } else if (type === 'hazard_delete') {
             setDisruptions((prev) => prev.filter((d) => d.id !== payload && d.id !== payload.id));
           } else if (type === 'hub_insert') {
-            setHubs((prev) => [payload, ...prev.filter((h) => h.name !== payload.name && h.id !== payload.id)]);
+            const norm = normalizeSupplyHub(payload);
+            setHubs((prev) => [norm, ...prev.filter((h) => h.name !== norm.name && h.id !== norm.id)]);
           } else if (type === 'hub_update') {
-            setHubs((prev) => prev.map((h) => (h.name === payload.name || h.id === payload.id ? payload : h)));
+            const norm = normalizeSupplyHub(payload);
+            setHubs((prev) => prev.map((h) => (h.name === norm.name || h.id === norm.id ? norm : h)));
           } else if (type === 'hub_delete') {
             setHubs((prev) => prev.filter((h) => h.name !== payload && h.id !== payload));
           } else if (type === 'shipment_insert') {

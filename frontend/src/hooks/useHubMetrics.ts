@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase, BASELINE_SUPPLY_HUBS } from '@/lib/supabaseClient';
+import { supabase, BASELINE_SUPPLY_HUBS, normalizeSupplyHub } from '@/lib/supabaseClient';
 import { SupplyHub } from '@/types';
 
 export function useHubMetrics() {
-  const [hubs, setHubs] = useState<SupplyHub[]>(BASELINE_SUPPLY_HUBS);
+  const [hubs, setHubs] = useState<SupplyHub[]>(BASELINE_SUPPLY_HUBS.map(normalizeSupplyHub));
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
@@ -20,7 +20,7 @@ export function useHubMetrics() {
             .order('state', { ascending: true });
 
           if (!error && data && data.length > 0 && isMounted) {
-            setHubs(data as SupplyHub[]);
+            setHubs(data.map(normalizeSupplyHub));
           }
         } catch (err) {
           console.warn('[useHubMetrics] Error fetching supply hubs:', err);

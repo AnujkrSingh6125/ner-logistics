@@ -14,7 +14,7 @@ import {
   calculateCargoAdjustedETA,
 } from '@/lib/spatial';
 import { useAuth } from '@/context/AuthContext';
-import { BASELINE_SUPPLY_HUBS } from '@/lib/supabaseClient';
+import { BASELINE_SUPPLY_HUBS, normalizeSupplyHub } from '@/lib/supabaseClient';
 import RegisterShipmentModal from './RegisterShipmentModal';
 import {
   Navigation,
@@ -103,15 +103,16 @@ export default function RoutePlanner({
 
   const cargoConfig = CARGO_MANIFEST_PRESETS[cargoTier];
 
-  // Ensure robust hub dataset with guaranteed baseline fallback
+  // Ensure robust hub dataset with guaranteed baseline fallback & normalization
   const availableHubs = React.useMemo(() => {
     const rawList = hubs && hubs.length > 0 ? hubs : BASELINE_SUPPLY_HUBS;
     const map = new Map<string, SupplyHub>();
     for (const h of rawList) {
-      if (h && (h.id || h.name)) {
-        const key = h.id || h.name;
-        if (!map.has(key)) {
-          map.set(key, h);
+      if (h) {
+        const norm = normalizeSupplyHub(h);
+        const key = norm.id || norm.name;
+        if (key && !map.has(key)) {
+          map.set(key, norm);
         }
       }
     }
@@ -122,27 +123,31 @@ export default function RoutePlanner({
   const resolvedOriginValue = React.useMemo(() => {
     if (!originHub) return '';
     if (originHub.id === 'current-location') return 'current-location';
+    const originName = (originHub.name || originHub.id || '').toLowerCase().trim();
     const match = availableHubs.find(
       (h) =>
-        h.id === originHub.id ||
-        (h.name && originHub.name && h.name.toLowerCase().trim() === originHub.name.toLowerCase().trim())
+        (h.id && h.id === originHub.id) ||
+        (h.name && h.name.toLowerCase().trim() === originName) ||
+        (h.id && h.id.toLowerCase().trim() === originName)
     );
-    return match ? match.id : originHub.id;
+    return match ? (match.id || match.name) : (originHub.id || originHub.name || '');
   }, [originHub, availableHubs]);
 
   // Robust value resolution for Destination
   const resolvedDestValue = React.useMemo(() => {
     if (!destHub) return '';
+    const destName = (destHub.name || destHub.id || '').toLowerCase().trim();
     const match = availableHubs.find(
       (h) =>
-        h.id === destHub.id ||
-        (h.name && destHub.name && h.name.toLowerCase().trim() === destHub.name.toLowerCase().trim())
+        (h.id && h.id === destHub.id) ||
+        (h.name && h.name.toLowerCase().trim() === destName) ||
+        (h.id && h.id.toLowerCase().trim() === destName)
     );
-    return match ? match.id : destHub.id;
+    return match ? (match.id || match.name) : (destHub.id || destHub.name || '');
   }, [destHub, availableHubs]);
 
   const handleOriginChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
+    const val = e.target.value.trim();
     if (val === 'current-location') {
       onUseCurrentLocation?.();
       return;
@@ -155,13 +160,15 @@ export default function RoutePlanner({
       availableHubs.find(
         (h) =>
           h.id === val ||
-          (h.name && h.name.toLowerCase().trim() === val.toLowerCase().trim())
+          h.name === val ||
+          (h.name && h.name.toLowerCase().trim() === val.toLowerCase()) ||
+          (h.id && h.id.toLowerCase().trim() === val.toLowerCase())
       ) || null;
     onSetOrigin(selected);
   };
 
   const handleDestinationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
+    const val = e.target.value.trim();
     if (!val) {
       onSetDestination(null);
       return;
@@ -170,7 +177,9 @@ export default function RoutePlanner({
       availableHubs.find(
         (h) =>
           h.id === val ||
-          (h.name && h.name.toLowerCase().trim() === val.toLowerCase().trim())
+          h.name === val ||
+          (h.name && h.name.toLowerCase().trim() === val.toLowerCase()) ||
+          (h.id && h.id.toLowerCase().trim() === val.toLowerCase())
       ) || null;
     onSetDestination(selected);
   };
