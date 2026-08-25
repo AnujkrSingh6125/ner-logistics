@@ -94,10 +94,20 @@ export default function AccessGateway({
       return;
     }
 
+    const rawDigits = phone.replace(/\D/g, '');
+    const cleanDigits = rawDigits.length === 12 && rawDigits.startsWith('91') ? rawDigits.slice(2) : rawDigits;
+
+    if (phone.trim() && cleanDigits.length !== 10) {
+      setErrorMsg('Invalid Phone Number: Phone number must be exactly 10 digits.');
+      return;
+    }
+
+    const formattedPhone = cleanDigits.length === 10 ? `+91 ${cleanDigits}` : '+91 98765 43210';
+
     const metadata: Record<string, any> = {
       full_name: fullName.trim() || (selectedRole === 'GOV_AUTHORITY' ? 'Government Official' : 'Citizen Operator'),
       role: selectedRole,
-      phone: phone.trim() || '+91 98765 43210',
+      phone: formattedPhone,
       hub_id: selectedRole === 'SUPPLY_HUB' ? hubId : undefined,
       agency: selectedRole === 'GOV_AUTHORITY' ? agencyName : undefined,
     };
@@ -324,17 +334,32 @@ export default function AccessGateway({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Emergency Contact Phone (+91)
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+                  <span>Emergency Contact Phone</span>
+                  <span
+                    className={`text-[10px] font-mono font-bold ${
+                      phone.replace(/\D/g, '').length === 10
+                        ? 'text-emerald-400'
+                        : phone.replace(/\D/g, '').length > 0
+                        ? 'text-rose-400'
+                        : 'text-slate-500'
+                    }`}
+                  >
+                    {phone.replace(/\D/g, '').length}/10 digits
+                  </span>
                 </label>
-                <div className="relative">
-                  <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <div className="relative flex rounded-xl bg-slate-950/80 border border-slate-700/80 overflow-hidden focus-within:border-cyan-400 focus-within:ring-1 focus-within:ring-cyan-400 transition">
+                  <div className="flex items-center gap-1 px-3 bg-slate-900 border-r border-slate-800 text-slate-300 text-xs font-mono font-bold shrink-0">
+                    <Phone className="w-3.5 h-3.5 text-slate-400" />
+                    <span>+91</span>
+                  </div>
                   <input
                     type="tel"
+                    maxLength={10}
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+91 98765 43210"
-                    className="w-full pl-10 pr-3.5 py-2.5 text-xs bg-slate-950/80 border border-slate-700/80 rounded-xl text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    placeholder="9876543210"
+                    className="w-full px-3 py-2.5 text-xs bg-transparent text-slate-100 placeholder:text-slate-500 focus:outline-none font-mono tracking-wider"
                   />
                 </div>
               </div>

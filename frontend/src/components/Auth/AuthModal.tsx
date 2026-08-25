@@ -45,7 +45,8 @@ export default function AuthModal() {
   // Citizen Registration State
   const [fullName, setFullName] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
-  const [signupPhone, setSignupPhone] = useState('+91 ');
+  const [signupPhone, setSignupPhone] = useState('');
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [signupPassword, setSignupPassword] = useState('');
 
   // Email OTP Verification State (6-Digit Individual Boxes)
@@ -214,14 +215,16 @@ export default function AuthModal() {
     }
 
     const cleanPhone = signupPhone.replace(/\D/g, '');
-    if (cleanPhone.length < 10) {
-      setErrorMsg('Please enter a valid 10-digit mobile number with +91 country code.');
+    if (cleanPhone.length !== 10) {
+      setErrorMsg('Invalid Phone Number: Phone number must be exactly 10 digits.');
+      setPhoneError('Invalid Phone Number: Phone number must be exactly 10 digits.');
       return;
     }
 
+    setPhoneError(null);
     setIsLoading(true);
     try {
-      const res = await sendEmailOTP(fullName, signupEmail, signupPhone, signupPassword);
+      const res = await sendEmailOTP(fullName, signupEmail, `+91 ${cleanPhone}`, signupPassword);
       if (res.success) {
         setOtpCountdown(60);
         setSuccessMsg(res.message);
@@ -653,19 +656,55 @@ export default function AuthModal() {
                       <div>
                         <label className="block text-xs font-medium text-slate-300 mb-1 flex items-center justify-between">
                           <span>Phone Number (Mandatory Telemetry & Rescue)</span>
-                          <span className="text-[10px] text-amber-400 font-semibold">Required</span>
+                          <span
+                            className={`text-[10px] font-mono font-bold ${
+                              signupPhone.replace(/\D/g, '').length === 10
+                                ? 'text-emerald-400'
+                                : signupPhone.replace(/\D/g, '').length > 0
+                                ? 'text-rose-400'
+                                : 'text-amber-400'
+                            }`}
+                          >
+                            {signupPhone.replace(/\D/g, '').length}/10 digits
+                          </span>
                         </label>
-                        <div className="relative">
-                          <Phone className="w-4 h-4 absolute left-3.5 top-3 text-slate-500" />
+                        <div
+                          className={`relative flex rounded-xl bg-slate-950 border overflow-hidden focus-within:border-blue-500 transition ${
+                            phoneError && signupPhone.length > 0
+                              ? 'border-rose-500 ring-1 ring-rose-500/40'
+                              : signupPhone.replace(/\D/g, '').length === 10
+                              ? 'border-emerald-500/60 ring-1 ring-emerald-500/30'
+                              : 'border-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1 px-3 bg-slate-900 border-r border-slate-800 text-slate-300 text-xs font-mono font-bold shrink-0">
+                            <Phone className="w-3.5 h-3.5 text-slate-400" />
+                            <span>+91</span>
+                          </div>
                           <input
                             type="tel"
+                            maxLength={10}
                             value={signupPhone}
-                            onChange={(e) => setSignupPhone(e.target.value)}
-                            placeholder="+91 98765 43210"
-                            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 text-xs font-mono"
+                            onChange={(e) => {
+                              const raw = e.target.value.replace(/\D/g, '').slice(0, 10);
+                              setSignupPhone(raw);
+                              if (raw.length > 0 && raw.length !== 10) {
+                                setPhoneError('Invalid Phone Number: Phone number must be exactly 10 digits.');
+                              } else {
+                                setPhoneError(null);
+                              }
+                            }}
+                            placeholder="9876543210"
+                            className="w-full px-3 py-2.5 bg-transparent text-slate-100 placeholder-slate-600 focus:outline-none text-xs font-mono tracking-wider"
                             required
                           />
                         </div>
+                        {phoneError && signupPhone.length > 0 && (
+                          <p className="text-[11px] text-rose-400 mt-1 flex items-center gap-1 font-medium animate-in fade-in">
+                            <AlertTriangle className="w-3 h-3 shrink-0 text-rose-400" />
+                            <span>{phoneError}</span>
+                          </p>
+                        )}
                       </div>
 
                       <div>

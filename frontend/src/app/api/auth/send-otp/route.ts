@@ -19,6 +19,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (isRegistration && phone) {
+      const rawDigits = String(phone).replace(/\D/g, '');
+      const cleanPhoneDigits = rawDigits.length === 12 && rawDigits.startsWith('91') ? rawDigits.slice(2) : rawDigits;
+      if (cleanPhoneDigits.length !== 10) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid Phone Number: Phone number must be exactly 10 digits.' },
+          { status: 400 }
+        );
+      }
+    }
+
     // 0. Strict Uniqueness Check: Only a single user can create an account with an email ID
     if (isRegistration && supabase) {
       try {

@@ -25,6 +25,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const rawDigits = String(phone).replace(/\D/g, '');
+    const cleanPhoneDigits = rawDigits.length === 12 && rawDigits.startsWith('91') ? rawDigits.slice(2) : rawDigits;
+    if (cleanPhoneDigits.length !== 10) {
+      return NextResponse.json(
+        { error: 'Invalid Phone Number: Phone number must be exactly 10 digits.' },
+        { status: 400 }
+      );
+    }
+
     const cleanEmail = email.trim().toLowerCase();
 
     // Check if account already exists with this email address

@@ -586,7 +586,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     password?: string
   ): Promise<{ success: boolean; message: string }> => {
     const cleanEmail = email.trim().toLowerCase();
-    const cleanPhone = phone.trim();
+    const rawDigits = phone.replace(/\D/g, '');
+    const cleanDigits = rawDigits.length === 12 && rawDigits.startsWith('91') ? rawDigits.slice(2) : rawDigits;
+    
+    if (cleanDigits.length !== 10) {
+      return {
+        success: false,
+        message: 'Invalid Phone Number: Phone number must be exactly 10 digits.',
+      };
+    }
+
+    const cleanPhone = `+91 ${cleanDigits}`;
     const cleanName = fullName.trim();
     const generatedUid = `NER-CIT-${Math.floor(10000 + Math.random() * 90000)}`;
 
