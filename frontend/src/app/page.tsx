@@ -13,6 +13,7 @@ import AlternateHubRecommender from '@/components/Dashboard/AlternateHubRecommen
 import DisruptionAssistantChat from '@/components/Chat/DisruptionAssistantChat';
 import AuthModal from '@/components/Auth/AuthModal';
 import { useAuth } from '@/context/AuthContext';
+import useRealtimeTelemetry from '@/hooks/useRealtimeTelemetry';
 import {
   supabase,
   fetchSupplyHubs,
@@ -20,9 +21,6 @@ import {
   fetchShipments,
   deleteShipment,
   updateShipmentTelemetry,
-  subscribeToAllShipmentsRealtime,
-  subscribeToAllHazardsRealtime,
-  subscribeToAllSupplyHubsRealtime,
   BASELINE_SUPPLY_HUBS,
   BASELINE_DISRUPTIONS,
   FALLBACK_SHIPMENTS,
@@ -62,11 +60,26 @@ export default function DashboardPage() {
   // Mobile viewport tab state ('map' | 'planner' | 'alerts' | 'fleet')
   const [mobileTab, setMobileTab] = useState<'map' | 'planner' | 'alerts' | 'fleet'>('map');
 
-  // Pre-seed state with baseline data for instant hydration & 100% offline resilience
-  const [hubs, setHubs] = useState<SupplyHub[]>(BASELINE_SUPPLY_HUBS);
-  const [disruptions, setDisruptions] = useState<RoadDisruption[]>(BASELINE_DISRUPTIONS);
-  const [shipments, setShipments] = useState<Shipment[]>([]);
+  // Live Realtime Telemetry Hook (Hubs, Disruptions, Shipments with ner_global_live_stream channel)
+  const {
+    hubs,
+    setHubs,
+    disruptions,
+    setDisruptions,
+    shipments,
+    setShipments,
+    loading: isTelemetryLoading,
+    refresh: loadData,
+  } = useRealtimeTelemetry();
+
   const [trackedShipment, setTrackedShipment] = useState<Shipment | null>(null);
+
+  // Automatically track first active shipment once loaded
+  useEffect(() => {
+    if (!trackedShipment && shipments.length > 0) {
+      setTrackedShipment(shipments[0]);
+    }
+  }, [shipments, trackedShipment]);
 
   // Selection and routing states
   const [selectedHub, setSelectedHub] = useState<SupplyHub | null>(null);
@@ -107,147 +120,48 @@ export default function DashboardPage() {
   const [showBuffers, setShowBuffers] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
-  // Initial Data Load from Supabase (fails gracefully to baseline)
-  const loadData = useCallback(async () => {
-    setIsRefreshing(true);
-    try {
-      const [hubsData, disruptionsData, shipmentsData] = await Promise.all([
-        fetchSupplyHubs(),
-        fetchRoadDisruptions(),
-        fetchShipments(),
-      ]);
-      if (hubsData && hubsData.length > 0) setHubs(hubsData);
-      if (disruptionsData && disruptionsData.length > 0) setDisruptions(disruptionsData);
-      if (shipmentsData) {
-        console.log(`[GLOBAL HYDRATION] Populated ${shipmentsData.length} active convoys from PostgreSQL.`);
-        setShipments(shipmentsData);
-        setTrackedShipment((prevTracked) => {
-          if (!prevTracked && shipmentsData.length > 0) {
-            return shipmentsData[0];
-          }
-          return prevTracked;
-        });
-      }
-    } catch (err) {
-      console.warn('Supabase fetch error, fallback active:', err);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, []);
-
+  // Dynamic Real-time Corridor Re-route Risk Check on disruptions update
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (!routeData || !originHub || !destHub || disruptions.length === 0) return;
+    const activeCoords =
+      routeData.candidateRoutes?.[selectedRouteIndex]?.geometry?.coordinates ||
+      routeData.primaryRoute?.geometry?.coordinates;
 
-  // Realtime Supabase Subscription on road_disruptions & hazards tables
-  useEffect(() => {
-    const unsub = subscribeToAllHazardsRealtime(
-      (newDisruption) => {
-        setDisruptions((prev) => {
-          if (prev.some((d) => d.id === newDisruption.id)) return prev;
-          return [newDisruption, ...prev];
-        });
+    if (activeCoords && activeCoords.length >= 2) {
+      try {
+        const routeLine = turf.lineString(activeCoords);
+        for (const newDisruption of disruptions) {
+          if (newDisruption.is_active === false) continue;
+          const hazardPt = turf.point([newDisruption.longitude, newDisruption.latitude]);
+          const distMeters = turf.pointToLineDistance(hazardPt, routeLine, { units: 'meters' });
+          const bufferMeters = newDisruption.risk_radius_meters || 1500;
 
-        // Dynamic Real-time Corridor Re-route Risk Check
-        if (routeData && originHub && destHub) {
-          const activeCoords =
-            routeData.candidateRoutes?.[selectedRouteIndex]?.geometry?.coordinates ||
-            routeData.primaryRoute?.geometry?.coordinates;
-
-          if (activeCoords && activeCoords.length >= 2) {
-            try {
-              const routeLine = turf.lineString(activeCoords);
-              const hazardPt = turf.point([newDisruption.longitude, newDisruption.latitude]);
-              const distMeters = turf.pointToLineDistance(hazardPt, routeLine, { units: 'meters' });
-              const bufferMeters = newDisruption.risk_radius_meters || 1500;
-
-              if (distMeters <= bufferMeters) {
-                console.log(
-                  `[REALTIME HAZARD INTERCEPTION] New hazard intersects planned route (${Math.round(
-                    distMeters
-                  )}m away). Recalculating resilient path...`
-                );
-                calculateRoute(
-                  originHub.latitude,
-                  originHub.longitude,
-                  destHub.latitude,
-                  destHub.longitude,
-                  'driving',
-                  originHub.name,
-                  destHub.name,
-                  cargoTier
-                )
-                  .then((recalculated) => setRouteData(recalculated))
-                  .catch((e) => console.warn('Hazard-triggered re-routing notice:', e));
-              }
-            } catch (err) {
-              // Ignore turf computation error
-            }
+          if (distMeters <= bufferMeters) {
+            console.log(
+              `[REALTIME HAZARD INTERCEPTION] Hazard "${newDisruption.title}" intersects route (${Math.round(
+                distMeters
+              )}m away). Recalculating resilient path...`
+            );
+            calculateRoute(
+              originHub.latitude,
+              originHub.longitude,
+              destHub.latitude,
+              destHub.longitude,
+              'driving',
+              originHub.name,
+              destHub.name,
+              cargoTier
+            )
+              .then((recalculated) => setRouteData(recalculated))
+              .catch((e) => console.warn('Hazard-triggered re-routing notice:', e));
+            break;
           }
         }
-      },
-      (updatedDisruption) => {
-        setDisruptions((prev) =>
-          prev.map((d) => (d.id === updatedDisruption.id ? updatedDisruption : d))
-        );
-      },
-      (oldId) => {
-        setDisruptions((prev) => prev.filter((d) => d.id !== oldId));
+      } catch (err) {
+        // Ignore turf computation error
       }
-    );
-
-    return () => {
-      unsub();
-    };
-  }, [routeData, originHub, destHub, selectedRouteIndex, cargoTier]);
-
-  // Realtime Supabase Subscription on public.shipments table (Global Fleet Sync)
-  useEffect(() => {
-    const unsub = subscribeToAllShipmentsRealtime(
-      (incomingShipment) => {
-        console.log('[REALTIME BROADCAST RECEIVED] Convoy dispatch updated:', incomingShipment.id, incomingShipment.driver_name);
-        setShipments((prev) => {
-          const exists = prev.some((s) => s.id === incomingShipment.id);
-          if (exists) {
-            return prev.map((s) => (s.id === incomingShipment.id ? incomingShipment : s));
-          }
-          return [incomingShipment, ...prev];
-        });
-
-        setTrackedShipment((current) =>
-          current?.id === incomingShipment.id ? incomingShipment : current
-        );
-      },
-      (deletedId) => {
-        console.log('[REALTIME BROADCAST RECEIVED] Convoy shipment deleted:', deletedId);
-        setShipments((prev) => prev.filter((s) => s.id !== deletedId));
-        setTrackedShipment((current) => (current?.id === deletedId ? null : current));
-      }
-    );
-
-    return () => {
-      unsub();
-    };
-  }, []);
-
-  // Realtime Supabase Subscription on public.supply_hubs table
-  useEffect(() => {
-    const unsub = subscribeToAllSupplyHubsRealtime(
-      (incomingHub) => {
-        setHubs((prev) => [incomingHub, ...prev.filter((h) => h.name !== incomingHub.name && h.id !== incomingHub.id)]);
-      },
-      (updatedHub) => {
-        setHubs((prev) => prev.map((h) => (h.name === updatedHub.name || h.id === updatedHub.id ? updatedHub : h)));
-      },
-      (deletedNameOrId) => {
-        setHubs((prev) => prev.filter((h) => h.name !== deletedNameOrId && h.id !== deletedNameOrId));
-      }
-    );
-
-    return () => {
-      unsub();
-    };
-  }, []);
+    }
+  }, [disruptions, routeData, originHub, destHub, selectedRouteIndex, cargoTier]);
 
   // Driver Telemetry Transmission Pipeline: Throttled push to Supabase shipments
   const lastTelemetryPushRef = React.useRef<number>(0);

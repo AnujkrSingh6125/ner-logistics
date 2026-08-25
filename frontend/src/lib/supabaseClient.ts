@@ -1274,7 +1274,7 @@ export type RealtimeSyncEvent =
 let crossTabChannel: BroadcastChannel | null = null;
 if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
   try {
-    crossTabChannel = new BroadcastChannel('ner_logistics_realtime_sync');
+    crossTabChannel = new BroadcastChannel('ner_global_live_stream');
   } catch (e) {
     crossTabChannel = null;
   }
@@ -1301,7 +1301,7 @@ export function broadcastCrossSessionEvent(event: RealtimeSyncEvent) {
   // 3. Supabase Realtime broadcast message over active websocket channel
   if (supabase) {
     try {
-      const channel = supabase.channel('realtime-fleet-broadcast');
+      const channel = supabase.channel('ner_global_live_stream');
       channel.send({
         type: 'broadcast',
         event: event.type,

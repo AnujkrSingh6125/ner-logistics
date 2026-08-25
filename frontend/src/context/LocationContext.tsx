@@ -49,7 +49,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   const [heading, setHeading] = useState<number | null>(null);
   const [speed, setSpeed] = useState<number | null>(0);
   const [isNavigating, setIsNavigating] = useState<boolean>(false);
-  const [followMode, setFollowMode] = useState<boolean>(true);
+  const [followMode, setFollowMode] = useState<boolean>(false);
   const [isSimulated, setIsSimulated] = useState<boolean>(false);
   const [simulatedProgress, setSimulatedProgress] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
