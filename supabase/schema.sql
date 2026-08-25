@@ -1,17 +1,29 @@
 -- ============================================================================
--- 1. EXTENSIONS & INITIAL CLEANUP
+-- NER SMART LOGISTICS PLATFORM (SIH PROBLEM ID: 26002)
+-- MASTER DATABASE SCHEMA & REALTIME REPLICATION ENGINE
 -- ============================================================================
+-- 50 strategic supply hubs, 50 terminals, zero-error constraints, and realtime WebSockets.
+-- ============================================================================
+
+-- ----------------------------------------------------------------------------
+-- 1. EXTENSIONS & DATABASE CLEANUP
+-- ----------------------------------------------------------------------------
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Drop trigger and user sync function
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
+
+-- Drop obsolete profiles table and operational tables for clean setup
+DROP TABLE IF EXISTS public.profiles CASCADE;
 DROP TABLE IF EXISTS public.shipments CASCADE;
 DROP TABLE IF EXISTS public.road_disruptions CASCADE;
 DROP TABLE IF EXISTS public.supply_hub_terminals CASCADE;
 DROP TABLE IF EXISTS public.supply_hubs CASCADE;
-DROP TABLE IF EXISTS public.profiles CASCADE;
 
--- ============================================================================
+-- ----------------------------------------------------------------------------
 -- 2. TABLE: SUPPLY HUBS (Exactly 50 Strategic NER Hubs)
--- ============================================================================
+-- ----------------------------------------------------------------------------
 CREATE TABLE public.supply_hubs (
   name TEXT PRIMARY KEY,
   state TEXT NOT NULL,
@@ -45,9 +57,9 @@ CREATE TRIGGER enforce_max_50_hubs
   BEFORE INSERT ON public.supply_hubs
   FOR EACH ROW EXECUTE FUNCTION public.check_max_50_hubs();
 
--- ============================================================================
+-- ----------------------------------------------------------------------------
 -- 3. TABLE: SUPPLY HUB TERMINALS (Explicit PRIMARY KEY & UNIQUE Constraints)
--- ============================================================================
+-- ----------------------------------------------------------------------------
 CREATE TABLE public.supply_hub_terminals (
   hub_code TEXT PRIMARY KEY,
   hub_name TEXT NOT NULL REFERENCES public.supply_hubs(name) ON UPDATE CASCADE ON DELETE CASCADE,
@@ -59,23 +71,43 @@ CREATE TABLE public.supply_hub_terminals (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ============================================================================
--- 4. TABLE: PROFILES (Strict OTP-Confirmed Email Key)
--- ============================================================================
-CREATE TABLE public.profiles (
-  email TEXT PRIMARY KEY,
-  user_id UUID UNIQUE NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  full_name TEXT,
+-- ----------------------------------------------------------------------------
+-- 4. TABLE: DOMAIN SPECIFIC AUTH TABLES (Client Users & Officials)
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.client_users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  citizen_uid TEXT UNIQUE NOT NULL,
+  full_name TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
   phone TEXT,
-  role TEXT DEFAULT 'CITIZEN_DRIVER',
-  hub_id TEXT,
+  emergency_contact TEXT,
+  driver_license TEXT,
+  role TEXT DEFAULT 'citizen',
+  agency_name TEXT,
+  current_lat DOUBLE PRECISION,
+  current_lng DOUBLE PRECISION,
+  is_sharing_location BOOLEAN DEFAULT TRUE,
+  last_location_update TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ============================================================================
+CREATE TABLE IF NOT EXISTS public.government_officials (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  official_id TEXT UNIQUE NOT NULL,
+  agency_name TEXT NOT NULL,
+  full_name TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  phone TEXT,
+  clearance_tier TEXT DEFAULT 'COMMAND_OFFICER',
+  rank TEXT,
+  password_hash TEXT DEFAULT 'SECURE_AUTH_MANAGED',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ----------------------------------------------------------------------------
 -- 5. TABLE: ROAD DISRUPTIONS & SHIPMENTS
--- ============================================================================
+-- ----------------------------------------------------------------------------
 CREATE TABLE public.road_disruptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT,
@@ -125,13 +157,15 @@ CREATE TABLE public.shipments (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ============================================================================
+-- ----------------------------------------------------------------------------
 -- 6. REALTIME REPLICATION & RLS
--- ============================================================================
+-- ----------------------------------------------------------------------------
 ALTER TABLE public.supply_hubs REPLICA IDENTITY FULL;
 ALTER TABLE public.supply_hub_terminals REPLICA IDENTITY FULL;
 ALTER TABLE public.road_disruptions REPLICA IDENTITY FULL;
 ALTER TABLE public.shipments REPLICA IDENTITY FULL;
+ALTER TABLE public.client_users REPLICA IDENTITY FULL;
+ALTER TABLE public.government_officials REPLICA IDENTITY FULL;
 
 DO $$ 
 BEGIN 
@@ -151,68 +185,21 @@ END $$;
 
 ALTER TABLE public.supply_hubs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.supply_hub_terminals ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.client_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.government_officials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.road_disruptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shipments ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Public read supply_hubs" ON public.supply_hubs FOR SELECT USING (true);
 CREATE POLICY "Public read terminals" ON public.supply_hub_terminals FOR SELECT USING (true);
+CREATE POLICY "Public read client_users" ON public.client_users FOR ALL USING (true);
+CREATE POLICY "Public read government_officials" ON public.government_officials FOR ALL USING (true);
 CREATE POLICY "Operational road_disruptions" ON public.road_disruptions FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Operational shipments" ON public.shipments FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Profiles read" ON public.profiles FOR SELECT USING (true);
-CREATE POLICY "Profiles update" ON public.profiles FOR UPDATE USING (auth.uid() = user_id);
 
--- ============================================================================
--- 7. STRICT OTP-CONFIRMED USER TRIGGER
--- ============================================================================
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$ 
-BEGIN 
-  IF NEW.email_confirmed_at IS NULL THEN 
-    RETURN NEW; 
-  END IF; 
-
-  INSERT INTO public.profiles (
-    email,
-    user_id,
-    full_name,
-    phone,
-    role,
-    hub_id,
-    created_at,
-    updated_at
-  ) 
-  VALUES (
-    LOWER(NEW.email),
-    NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', 'NER Operator'),
-    NEW.raw_user_meta_data->>'phone',
-    COALESCE(NEW.raw_user_meta_data->>'role', 'CITIZEN_DRIVER'),
-    NEW.raw_user_meta_data->>'hub_id',
-    NOW(),
-    NOW()
-  ) 
-  ON CONFLICT (email) DO UPDATE 
-  SET 
-    user_id = EXCLUDED.user_id,
-    full_name = COALESCE(EXCLUDED.full_name, public.profiles.full_name),
-    phone = COALESCE(EXCLUDED.phone, public.profiles.phone),
-    role = COALESCE(EXCLUDED.role, public.profiles.role),
-    hub_id = COALESCE(EXCLUDED.hub_id, public.profiles.hub_id),
-    updated_at = NOW(); 
-
-  RETURN NEW; 
-END; 
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT OR UPDATE OF email_confirmed_at ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-
--- ============================================================================
--- 8. SEED: EXACTLY 50 SUPPLY HUBS
--- ============================================================================
+-- ----------------------------------------------------------------------------
+-- 7. SEED: EXACTLY 50 STRATEGIC SUPPLY HUBS
+-- ----------------------------------------------------------------------------
 INSERT INTO public.supply_hubs (name, state, district, latitude, longitude, capacity_tons, capacity_tonnes, current_load_tons, status, contact_phone, is_active) VALUES
 -- Assam (12 Hubs)
 ('Guwahati Central Hub', 'Assam', 'Kamrup Metropolitan', 26.1445, 91.7362, 2500, 2500, 1100, 'OPERATIONAL', '+91 94350 11223', true),
@@ -284,9 +271,9 @@ SET
   is_active = EXCLUDED.is_active,
   contact_phone = EXCLUDED.contact_phone;
 
--- ============================================================================
--- 9. SEED: EXACTLY 50 SUPPLY HUB TERMINALS (Unique hub_code & email)
--- ============================================================================
+-- ----------------------------------------------------------------------------
+-- 8. SEED: EXACTLY 50 SUPPLY HUB TERMINALS (Unique hub_code & email)
+-- ----------------------------------------------------------------------------
 INSERT INTO public.supply_hub_terminals (hub_code, hub_name, state, email, capacity_tonnes, contact_phone) VALUES
 -- Assam (12)
 ('HUB-AS-01', 'Guwahati Central Hub', 'Assam', 'hub.guwahati@nerlogistics.gov.in', 25000, '+91 94360 11001'),

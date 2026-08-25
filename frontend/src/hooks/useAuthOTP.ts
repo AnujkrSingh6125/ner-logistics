@@ -36,25 +36,6 @@ export function useAuthOTP(): UseAuthOTPResult {
     }
 
     try {
-      // 0. Pre-check: Enforce only a single user account per email ID
-      if (metadata.isRegistration && supabase) {
-        try {
-          const { data: existingProfile } = await supabase
-            .from('profiles')
-            .select('email')
-            .eq('email', cleanEmail)
-            .maybeSingle();
-
-          if (existingProfile) {
-            const msg =
-              'An account with this email address already exists. Only a single user can create an account per email ID. Please sign in instead.';
-            setErrorMsg(msg);
-            setLoading(false);
-            return false;
-          }
-        } catch (e) {}
-      }
-
       let supaSuccess = false;
 
       // 1. Primary: Supabase Native Passwordless OTP with emailRedirectTo: undefined

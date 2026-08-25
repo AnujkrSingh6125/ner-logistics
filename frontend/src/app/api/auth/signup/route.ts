@@ -29,22 +29,6 @@ export async function POST(request: NextRequest) {
 
     // Check if account already exists with this email address
     if (supabase) {
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('email', cleanEmail)
-        .maybeSingle();
-
-      if (existingProfile) {
-        return NextResponse.json(
-          {
-            error:
-              'An account with this email address already exists. Only a single user can create an account with an email ID. Please sign in instead.',
-          },
-          { status: 400 }
-        );
-      }
-
       const { data: existingClient } = await supabase
         .from('client_users')
         .select('email')

@@ -282,24 +282,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setPendingSignup(null);
   };
 
-  // Helper: Upsert User Profile to Supabase profiles (email PK) & client_users
+  // Helper: Upsert User Profile to Supabase client_users
   const syncCitizenToSupabase = async (citizen: UserProfile) => {
     if (!supabase) return citizen;
     try {
-      await supabase
-        .from('profiles')
-        .upsert(
-          {
-            email: citizen.email.trim().toLowerCase(),
-            user_id: citizen.id,
-            full_name: citizen.full_name,
-            phone: citizen.phone,
-            role: citizen.role || 'CITIZEN_DRIVER',
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'email' }
-        );
-
       const { data: dbClient, error: clientErr } = await supabase
         .from('client_users')
         .upsert(

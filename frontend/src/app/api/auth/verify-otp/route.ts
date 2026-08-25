@@ -83,27 +83,8 @@ export async function POST(request: NextRequest) {
       created_at: new Date().toISOString(),
     };
 
-    // 3. Commit Verified User to public.profiles (email PK) and public.client_users in Supabase
+    // 3. Commit Verified User to public.client_users in Supabase
     if (supabase) {
-      try {
-        await supabase
-          .from('profiles')
-          .upsert(
-            {
-              email: userProfile.email,
-              user_id: supaUser?.id || userProfile.id,
-              full_name: userProfile.full_name,
-              phone: userProfile.phone,
-              role: userRole,
-              hub_id: supaUser?.user_metadata?.hub_id || null,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'email' }
-          );
-      } catch (profEx) {
-        console.warn('[SUPABASE profiles UPSERT NOTICE]:', profEx);
-      }
-
       try {
         const { data: dbClient, error: clientErr } = await supabase
           .from('client_users')

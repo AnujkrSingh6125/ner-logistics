@@ -1195,20 +1195,28 @@ export async function verifyUserOtp(email: string, token: string) {
   return data; // contains session and user
 }
 
-// Query user profile by Primary Key (email)
+// Query user profile by email from client_users / metadata
 export async function fetchProfileByEmail(email: string): Promise<Profile | null> {
   const cleanEmail = email.trim().toLowerCase();
   if (!supabase) return null;
 
   try {
     const { data, error } = await supabase
-      .from('profiles')
+      .from('client_users')
       .select('*')
       .eq('email', cleanEmail)
       .maybeSingle();
 
     if (!error && data) {
-      return data as Profile;
+      return {
+        email: data.email,
+        user_id: data.id,
+        full_name: data.full_name,
+        phone: data.phone,
+        role: data.role || 'CITIZEN_DRIVER',
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+      } as Profile;
     }
   } catch (err) {
     console.warn('fetchProfileByEmail notice:', err);
@@ -1216,7 +1224,7 @@ export async function fetchProfileByEmail(email: string): Promise<Profile | null
   return null;
 }
 
-// Upsert user profile record into public.profiles
+// Upsert user profile record into public.client_users
 export async function upsertProfile(
   profile: Partial<Profile> & { email: string; user_id: string }
 ): Promise<Profile | null> {
@@ -1225,15 +1233,13 @@ export async function upsertProfile(
 
   try {
     const { data, error } = await supabase
-      .from('profiles')
+      .from('client_users')
       .upsert(
         {
           email: cleanEmail,
-          user_id: profile.user_id,
-          full_name: profile.full_name || null,
+          full_name: profile.full_name || 'Citizen User',
           phone: profile.phone || null,
-          role: profile.role || 'CITIZEN_DRIVER',
-          hub_id: profile.hub_id || null,
+          role: profile.role || 'citizen',
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'email' }
@@ -1242,7 +1248,15 @@ export async function upsertProfile(
       .single();
 
     if (!error && data) {
-      return data as Profile;
+      return {
+        email: data.email,
+        user_id: data.id,
+        full_name: data.full_name,
+        phone: data.phone,
+        role: data.role,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+      } as Profile;
     }
   } catch (err) {
     console.warn('upsertProfile notice:', err);
