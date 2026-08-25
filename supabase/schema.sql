@@ -2,8 +2,8 @@
 -- NER SMART LOGISTICS PLATFORM (SIH PROBLEM ID: 26002)
 -- MASTER UNIFIED DATABASE SCHEMA & REALTIME REPLICATION ENGINE
 -- ============================================================================
--- This master file consolidates all tables, triggers, RLS policies, 
--- 50 curated strategic supply hubs, and realtime publication configs.
+-- ----------------------------------------------------------------------------
+-- 30 curated strategic supply hubs, and realtime publication configs.
 -- Paste directly into the Supabase SQL Editor and run.
 -- ============================================================================
 
@@ -227,7 +227,7 @@ AFTER INSERT OR UPDATE OF email_confirmed_at ON auth.users
 FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ----------------------------------------------------------------------------
--- 5. Table: supply_hubs (50 Curated Strategic Regional Hubs, name PRIMARY KEY)
+-- 5. Table: supply_hubs (30 Curated Strategic Regional Hubs, name PRIMARY KEY)
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.supply_hubs (
     name TEXT PRIMARY KEY,
