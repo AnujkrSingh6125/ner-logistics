@@ -119,19 +119,20 @@ export default function ShipmentFeed({
   };
 
   return (
-    <div className="bg-white/95 dark:bg-[#070e1c]/85 backdrop-blur-xl rounded-2xl p-4 border border-slate-200 dark:border-slate-800/80 shadow-md dark:shadow-[0_4px_24px_rgba(0,0,0,0.3)] transition-colors duration-200 space-y-3.5 text-slate-900 dark:text-slate-100">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+    <div className="bg-white/95 dark:bg-[#041217]/90 backdrop-blur-xl rounded-2xl p-4 border border-slate-200 dark:border-teal-500/30 border-t-4 border-t-teal-500 shadow-md dark:shadow-[0_4px_24px_rgba(0,0,0,0.3)] transition-colors duration-200 space-y-3.5 text-slate-900 dark:text-slate-100">
+      {/* Header (Tactical Dark Teal / Radar Emerald) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-800/80 bg-teal-50/40 dark:bg-teal-950/20 p-2 rounded-xl">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-600 dark:text-teal-400 shadow-inner">
             <Truck className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+            <h2 className="font-bold text-slate-900 dark:text-slate-100 text-sm tracking-tight">
               Active Logistics & Fleet Tracking
             </h2>
             <p className="text-[10px] text-slate-500 dark:text-slate-400">
               {canObserveTelemetry
-                ? 'Live Telemetry, Dispatches & Citizen GPS Radar'
+                ? 'Tactical Telemetry, Dispatches & Citizen Radar'
                 : 'Convoy Manifest Overview (Telemetry Locked)'}
             </p>
           </div>
@@ -139,14 +140,14 @@ export default function ShipmentFeed({
 
         {/* Tab Switcher (Fleet vs Radar) */}
         {canObserveTelemetry && (
-          <div className="flex items-center bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
+          <div className="flex items-center bg-slate-100 dark:bg-slate-900/90 p-1 rounded-xl border border-slate-200 dark:border-teal-800/40 text-xs">
             <button
               type="button"
               onClick={() => setFeedTab('fleet')}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium transition ${
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-bold transition ${
                 feedTab === 'fleet'
-                  ? 'bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+                  ? 'bg-white dark:bg-teal-950 text-teal-700 dark:text-teal-300 border border-slate-200 dark:border-teal-600/50 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
               }`}
             >
               <Truck className="w-3.5 h-3.5" />
@@ -155,16 +156,16 @@ export default function ShipmentFeed({
             <button
               type="button"
               onClick={() => setFeedTab('radar')}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium transition ${
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-bold transition ${
                 feedTab === 'radar'
-                  ? 'bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+                  ? 'bg-white dark:bg-teal-950 text-teal-700 dark:text-teal-300 border border-slate-200 dark:border-teal-600/50 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
               }`}
             >
-              <Radar className={`w-3.5 h-3.5 ${trackedCitizen ? 'text-cyan-400 animate-spin' : ''}`} />
+              <Radar className={`w-3.5 h-3.5 ${trackedCitizen ? 'text-emerald-400 animate-spin' : ''}`} />
               <span>Citizen Radar</span>
               {trackedCitizen && (
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
               )}
             </button>
           </div>

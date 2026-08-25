@@ -181,21 +181,22 @@ export default function RoutePlanner({
       : 0;
 
   return (
-    <div className="bg-white/95 dark:bg-[#070e1c]/85 backdrop-blur-xl rounded-2xl p-4 border border-slate-200 dark:border-slate-800/80 shadow-md dark:shadow-[0_4px_24px_rgba(0,0,0,0.3)] space-y-3.5 text-slate-900 dark:text-slate-100 transition-colors duration-200">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-cyan-50 dark:bg-cyan-500/10 border border-cyan-200 dark:border-cyan-500/30 flex items-center justify-center text-cyan-600 dark:text-cyan-400">
+    <div className="bg-white/95 dark:bg-[#070e1c]/90 backdrop-blur-xl rounded-2xl p-4 border border-slate-200 dark:border-slate-800/80 border-t-4 border-t-cyan-500 shadow-md dark:shadow-[0_4px_24px_rgba(0,0,0,0.3)] space-y-3.5 text-slate-900 dark:text-slate-100 transition-colors duration-200">
+      {/* Header (Slate / Cyan Mission Control) */}
+      <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/30 p-2 rounded-xl">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-600 dark:text-cyan-400 shadow-inner">
             <Navigation className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-              Disaster-Resilient Route Engine
+            <h2 className="font-bold text-slate-900 dark:text-slate-100 text-sm tracking-tight flex items-center gap-1.5">
+              <span>Disaster-Resilient Route Engine</span>
             </h2>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400">Multi-Corridor Risk Evaluation & Routing</p>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400">Mission Control • Multi-Corridor AI Evaluation</p>
           </div>
         </div>
-        <span className="text-[10px] text-cyan-700 dark:text-cyan-300 font-mono font-bold bg-cyan-100 dark:bg-cyan-950/80 px-2 py-0.5 rounded-full border border-cyan-300 dark:border-cyan-800/60 flex items-center gap-1">
+        <span className="text-[10px] text-cyan-700 dark:text-cyan-300 font-mono font-bold bg-cyan-100 dark:bg-cyan-950/80 px-2.5 py-1 rounded-full border border-cyan-300 dark:border-cyan-700/60 shadow-sm flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 dark:bg-cyan-400 animate-pulse" />
           Active Engine
         </span>
       </div>
@@ -354,7 +355,7 @@ export default function RoutePlanner({
           <button
             onClick={handleCalculateRoute}
             disabled={!originHub || !destHub || loading}
-            className="flex-1 bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold py-2.5 px-3 rounded-xl text-xs transition-all shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed border border-cyan-400/30"
+            className="flex-1 bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white font-bold py-2.5 px-3 rounded-xl text-xs transition-all shadow-lg shadow-cyan-600/25 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed border border-cyan-400/40 active:scale-[0.99]"
           >
             {loading ? (
               <>
@@ -442,20 +443,25 @@ export default function RoutePlanner({
       {/* Calculated Route Results & Hazard Analysis */}
       {routeData && (
         <div className="pt-3 border-t border-slate-200 dark:border-slate-700/80 space-y-3">
-          {/* Multi-Route Alternative Exploration & Threat Assessment Matrix */}
+          {/* Multi-Route Alternative Exploration & Threat Assessment Matrix (Panel 2: Deep Indigo / Alert Charcoal) */}
           {routeData.candidateRoutes && routeData.candidateRoutes.length > 0 && (
-            <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-700/80 shadow-md space-y-2.5">
-              <div className="flex items-center justify-between">
+            <div className="p-3.5 rounded-xl bg-slate-900/95 dark:bg-[#090d1f]/95 border border-indigo-500/40 border-t-4 border-t-indigo-500 shadow-lg space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-indigo-500/20">
                 <div className="flex items-center gap-2">
-                  <div className="p-1 rounded-lg bg-cyan-500/20 text-cyan-400">
+                  <div className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
                     <Compass className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-slate-100">Multi-Route Alternative Exploration</h4>
-                    <p className="text-[10px] text-slate-400">Per-Corridor Gemini AI Threat Evaluation</p>
+                    <h4 className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
+                      <span>AI Threat Evaluation & Corridors</span>
+                      <span className="text-[9px] font-mono bg-indigo-950 text-indigo-300 border border-indigo-700/50 px-1.5 py-0.2 rounded">
+                        GEMINI AI
+                      </span>
+                    </h4>
+                    <p className="text-[10px] text-slate-400">Threat Matrix & Real-Time Bypass Corridors</p>
                   </div>
                 </div>
-                <span className="text-[10px] font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-700/60 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-mono font-bold bg-indigo-950 text-indigo-300 border border-indigo-700/60 px-2 py-0.5 rounded-full">
                   {routeData.candidateRoutes.length} Candidate Paths
                 </span>
               </div>
@@ -477,10 +483,14 @@ export default function RoutePlanner({
                     <div
                       key={`corridor-card-${corridor.id || idx}`}
                       onClick={() => onSelectCandidateRoute?.(idx)}
-                      className={`p-2.5 rounded-lg border transition cursor-pointer space-y-1.5 ${
-                        isSelected
-                          ? 'border-cyan-500 bg-cyan-950/40 ring-1 ring-cyan-500 shadow-md'
-                          : 'border-slate-800 bg-slate-950/60 hover:border-slate-700 hover:bg-slate-900/60'
+                      className={`p-3 rounded-xl border transition cursor-pointer space-y-2 ${
+                        isCompromised
+                          ? 'border-rose-500/50 bg-rose-950/30 text-rose-200 hover:border-rose-500 hover:bg-rose-950/40'
+                          : isRecommended
+                          ? 'border-emerald-500/50 bg-emerald-950/30 text-emerald-200 hover:border-emerald-500 hover:bg-emerald-950/40'
+                          : isSelected
+                          ? 'border-cyan-500 bg-cyan-950/40 ring-1 ring-cyan-500 text-cyan-200 shadow-md'
+                          : 'border-slate-800 bg-slate-950/70 hover:border-slate-700 text-slate-300'
                       }`}
                     >
                       {/* Header row */}
@@ -498,7 +508,7 @@ export default function RoutePlanner({
                           {isRecommended && (
                             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
                               <Sparkles className="w-2.5 h-2.5" />
-                              AI Recommended
+                              AI Safe Detour
                             </span>
                           )}
                           <span
@@ -542,7 +552,7 @@ export default function RoutePlanner({
 
                       {/* AI Brief */}
                       {evalData?.ai_brief && (
-                        <p className="text-[10px] text-slate-300 bg-slate-900/90 p-1.5 rounded border border-slate-800 leading-relaxed">
+                        <p className="text-[10px] text-slate-300 bg-slate-900/90 p-2 rounded-lg border border-slate-800 leading-relaxed">
                           <span className="text-cyan-400 font-semibold">Gemini Brief: </span>
                           {evalData.ai_brief}
                         </p>
@@ -570,9 +580,9 @@ export default function RoutePlanner({
                           e.stopPropagation();
                           onSelectCandidateRoute?.(idx);
                         }}
-                        className={`w-full mt-1 py-1 px-2 rounded text-[10px] font-bold transition flex items-center justify-center gap-1.5 ${
+                        className={`w-full mt-1 py-1.5 px-2 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1.5 ${
                           isSelected
-                            ? 'bg-cyan-600 text-white shadow-sm'
+                            ? 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-sm'
                             : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700'
                         }`}
                       >
@@ -586,12 +596,12 @@ export default function RoutePlanner({
             </div>
           )}
 
-          {/* Dual-Stream Intelligence Assessment (Government Authorized vs Live Web Grounding) */}
+          {/* Dual-Stream Corridor Intelligence Panel (Panel 3: Amber & Electric Blue Split) */}
           {routeData.dualStreamIntelligence && (
-            <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-700/80 shadow-md space-y-2.5">
-              <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
+            <div className="p-3.5 rounded-xl bg-slate-900/95 dark:bg-[#0c0d14]/95 border border-amber-500/40 border-t-4 border-t-amber-500 shadow-md space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-amber-500/20">
                 <div className="flex items-center gap-2">
-                  <div className="p-1 rounded-lg bg-amber-500/20 text-amber-400">
+                  <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30">
                     <Radio className="w-4 h-4 animate-pulse" />
                   </div>
                   <div>
@@ -602,20 +612,20 @@ export default function RoutePlanner({
                       </span>
                     </h4>
                     <p className="text-[10px] text-slate-400">
-                      Segregated Official Database Directives vs Real-Time Web Grounding
+                      Official Government Directives vs Real-Time Web Grounding
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Stream 1: Government Authorized Data */}
-              <div className="p-2.5 rounded-lg bg-amber-950/20 border border-amber-800/50 space-y-2">
+              {/* Stream 1: Government Authorized Data (Warm Amber / Orange Tinted Card) */}
+              <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/30 text-amber-200 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
                     <Building2 className="w-3.5 h-3.5 text-amber-400" />
                     Stream 1: Government Authorized Data
                   </span>
-                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-900/60 text-amber-200 border border-amber-700/60 uppercase">
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-amber-900/60 text-amber-200 border border-amber-700/60 uppercase font-mono">
                     {routeData.dualStreamIntelligence.government_authorized_data.has_disruptions
                       ? `${routeData.dualStreamIntelligence.government_authorized_data.records.length} Directives`
                       : 'Zero Disruptions'}
@@ -628,7 +638,7 @@ export default function RoutePlanner({
                       (rec, rIdx) => (
                         <div
                           key={`gov-rec-${rIdx}`}
-                          className="bg-slate-950/80 p-2 rounded border border-amber-900/40 text-[11px] space-y-1"
+                          className="bg-slate-950/90 p-2.5 rounded-lg border border-amber-900/50 text-[11px] space-y-1 text-slate-200"
                         >
                           <div className="flex items-center justify-between text-[10px]">
                             <span className="font-bold text-amber-300 truncate">
@@ -638,10 +648,10 @@ export default function RoutePlanner({
                               {rec.severity} ({rec.distance_to_route_km} km)
                             </span>
                           </div>
-                          <div className="text-slate-200 text-[10px] font-medium leading-tight bg-amber-950/30 p-1.5 rounded border-l-2 border-amber-500">
+                          <div className="text-amber-100 text-[10px] font-medium leading-relaxed bg-amber-950/40 p-2 rounded border-l-2 border-amber-500">
                             &ldquo;{rec.message}&rdquo;
                           </div>
-                          <div className="flex items-center justify-between text-[9px] text-slate-400 font-mono">
+                          <div className="flex items-center justify-between text-[9px] text-slate-400 font-mono pt-0.5">
                             <span>Corridor: {rec.highway}</span>
                             <span>GPS: {rec.coordinates[0]?.toFixed(2)}, {rec.coordinates[1]?.toFixed(2)}</span>
                           </div>
@@ -654,47 +664,48 @@ export default function RoutePlanner({
                     {routeData.dualStreamIntelligence.government_authorized_data.official_summary}
                   </p>
                 )}
-                <div className="text-[9px] text-amber-400/80 font-mono">
+                <div className="text-[9px] text-amber-400/90 font-mono">
                   🔒 {routeData.dualStreamIntelligence.government_authorized_data.official_summary}
                 </div>
               </div>
 
-              {/* Stream 2: Internet Live Intelligence (Gemini + Google Search Grounding) */}
-              <div className="p-2.5 rounded-lg bg-cyan-950/20 border border-cyan-800/50 space-y-2">
+              {/* Stream 2: Internet Live Intelligence (Electric Cyan / Sky Blue Tinted Card) */}
+              <div className="p-3 rounded-xl bg-sky-950/20 border border-sky-500/30 text-sky-200 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-cyan-300 flex items-center gap-1.5">
-                    <Globe className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="text-[11px] font-bold text-sky-300 flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5 text-sky-400" />
                     Stream 2: Internet Live Intelligence
                   </span>
-                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-cyan-900/60 text-cyan-200 border border-cyan-700/60 uppercase">
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-sky-900/60 text-sky-200 border border-sky-700/60 uppercase font-mono flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
                     Web Grounded
                   </span>
                 </div>
 
-                <div className="bg-slate-950/80 p-2 rounded border border-cyan-900/40 text-[11px] space-y-1.5">
+                <div className="bg-slate-950/90 p-2.5 rounded-lg border border-sky-900/50 text-[11px] space-y-2 text-slate-200">
                   <div>
-                    <span className="text-[9px] font-bold uppercase text-cyan-400 block">
+                    <span className="text-[9px] font-bold uppercase text-sky-400 block mb-0.5">
                       🌦️ Live Weather Bulletin:
                     </span>
-                    <p className="text-slate-200 text-[10px] leading-tight">
+                    <p className="text-sky-100 text-[10px] leading-relaxed">
                       {routeData.dualStreamIntelligence.internet_live_intelligence.weather_advisory}
                     </p>
                   </div>
 
                   <div>
-                    <span className="text-[9px] font-bold uppercase text-cyan-400 block">
+                    <span className="text-[9px] font-bold uppercase text-sky-400 block mb-0.5">
                       🚗 Real-Time Highway Movement:
                     </span>
-                    <p className="text-slate-200 text-[10px] leading-tight">
+                    <p className="text-sky-100 text-[10px] leading-relaxed">
                       {routeData.dualStreamIntelligence.internet_live_intelligence.live_traffic_status}
                     </p>
                   </div>
 
-                  <div className="flex items-center justify-between text-[9px] text-cyan-300/80 pt-1 border-t border-slate-800 font-mono">
-                    <span>
+                  <div className="flex items-center justify-between text-[9px] text-sky-300/80 pt-1.5 border-t border-slate-800 font-mono">
+                    <span className="truncate max-w-[200px]">
                       Sources: {routeData.dualStreamIntelligence.internet_live_intelligence.sources.join(', ')}
                     </span>
-                    <span>Gemini Live Search Grounding</span>
+                    <span className="shrink-0 text-sky-400">Gemini Live Grounding</span>
                   </div>
                 </div>
               </div>
@@ -781,63 +792,63 @@ export default function RoutePlanner({
 
           {/* Route Comparison (Primary vs Detour) with Cargo Adjusted ETA */}
           {primary && detour && primaryETA && detourETA && (
-            <div className="bg-slate-50 dark:bg-slate-900/80 p-3 rounded-lg border border-slate-200 dark:border-slate-700/80 space-y-2 text-xs">
-              <div className="font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between text-[11px]">
-                <span>Telemetry with Cargo Elevation Factor</span>
-                <span className="text-emerald-600 dark:text-emerald-400 font-mono">
+            <div className="bg-slate-900/90 dark:bg-[#070b16] p-3.5 rounded-xl border border-slate-700/80 border-t-4 border-t-indigo-500 space-y-2.5 text-xs shadow-md">
+              <div className="font-bold text-slate-200 flex items-center justify-between text-[11px] pb-1.5 border-b border-slate-800">
+                <span>AI Corridor Comparison & Elevation Factor</span>
+                <span className="text-emerald-400 font-mono font-bold">
                   +{deltaDistance} km ({deltaTime > 0 ? `+${deltaTime}m` : '0m'})
                 </span>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
-                {/* Primary stats */}
+                {/* Primary stats (High-visibility Crimson Alert Container) */}
                 <div
                   onClick={() => onSelectRouteView('PRIMARY')}
-                  className={`p-2 rounded border cursor-pointer transition ${
+                  className={`p-2.5 rounded-xl border cursor-pointer transition ${
                     activeRouteView === 'PRIMARY'
-                      ? 'border-red-500 bg-red-100/50 dark:bg-red-950/30 ring-1 ring-red-500'
-                      : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60 hover:border-slate-300 dark:hover:border-slate-700'
+                      ? 'border-rose-500 bg-rose-950/40 text-rose-200 ring-1 ring-rose-500 shadow-md shadow-rose-950/50'
+                      : 'border-rose-500/50 bg-rose-950/30 text-rose-200 hover:border-rose-500/80 hover:bg-rose-950/40'
                   }`}
                 >
-                  <div className="text-[10px] text-red-600 dark:text-red-400 font-semibold flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                  <div className="text-[10px] text-rose-300 font-bold flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
                     Primary (Compromised)
                   </div>
-                  <div className="font-bold text-slate-900 dark:text-slate-100 text-sm mt-0.5">
+                  <div className="font-bold text-white text-sm mt-0.5 font-mono">
                     {primary.distance_km} km
                   </div>
-                  <div className="text-[10px] text-slate-700 dark:text-slate-300 font-medium">
+                  <div className="text-[10px] text-rose-200 font-medium">
                     ETA: {primaryETA.etaString}
                   </div>
                   {primaryETA.delayBufferMinutes > 0 && (
-                    <div className="text-[9px] text-slate-500 dark:text-slate-400">
-                      +{primaryETA.delayBufferMinutes}m mountain buffer
+                    <div className="text-[9px] text-rose-300/80 font-mono">
+                      +{primaryETA.delayBufferMinutes}m terrain delay
                     </div>
                   )}
                 </div>
 
-                {/* Detour stats */}
+                {/* Detour stats (High-visibility Emerald Green Safety Container) */}
                 <div
                   onClick={() => onSelectRouteView('DETOUR')}
-                  className={`p-2 rounded border cursor-pointer transition ${
+                  className={`p-2.5 rounded-xl border cursor-pointer transition ${
                     activeRouteView === 'DETOUR'
-                      ? 'border-emerald-500 bg-emerald-100/50 dark:bg-emerald-950/40 ring-1 ring-emerald-500'
-                      : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60 hover:border-slate-300 dark:hover:border-slate-700'
+                      ? 'border-emerald-500 bg-emerald-950/50 text-emerald-200 ring-1 ring-emerald-500 shadow-md shadow-emerald-950/50'
+                      : 'border-emerald-500/50 bg-emerald-950/30 text-emerald-200 hover:border-emerald-500/80 hover:bg-emerald-950/40'
                   }`}
                 >
-                  <div className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <div className="text-[10px] text-emerald-300 font-bold flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
                     Safe Detour (Verified)
                   </div>
-                  <div className="font-bold text-emerald-700 dark:text-emerald-300 text-sm mt-0.5">
+                  <div className="font-bold text-emerald-300 text-sm mt-0.5 font-mono">
                     {detour.distance_km} km
                   </div>
-                  <div className="text-[10px] text-emerald-800 dark:text-emerald-300 font-medium">
+                  <div className="text-[10px] text-emerald-200 font-medium">
                     ETA: {detourETA.etaString}
                   </div>
                   {detourETA.delayBufferMinutes > 0 && (
-                    <div className="text-[9px] text-slate-500 dark:text-slate-400">
-                      +{detourETA.delayBufferMinutes}m mountain buffer
+                    <div className="text-[9px] text-emerald-300/80 font-mono">
+                      +{detourETA.delayBufferMinutes}m terrain delay
                     </div>
                   )}
                 </div>
