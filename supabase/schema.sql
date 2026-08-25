@@ -91,43 +91,46 @@ CREATE TABLE IF NOT EXISTS public.supply_hub_terminals (
 -- ----------------------------------------------------------------------------
 DO $$ 
 BEGIN 
-  -- Ensure supply_hub_terminals has email column and UNIQUE constraint
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'supply_hub_terminals') THEN
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'supply_hub_terminals' AND column_name = 'email') THEN
+  -- 1. Ensure supply_hub_terminals has email & hub_code with UNIQUE constraints
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'supply_hub_terminals') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'supply_hub_terminals' AND column_name = 'email') THEN
       ALTER TABLE public.supply_hub_terminals ADD COLUMN email TEXT;
     END IF;
     IF NOT EXISTS (
-      SELECT 1 FROM pg_constraint c 
-      JOIN pg_class t ON c.conrelid = t.oid 
-      WHERE t.relname = 'supply_hub_terminals' AND (c.conname = 'supply_hub_terminals_email_key' OR c.conname = 'supply_hub_terminals_email_unique')
+      SELECT 1 FROM pg_constraint 
+      WHERE conname = 'supply_hub_terminals_email_unique' OR conname = 'supply_hub_terminals_email_key'
     ) THEN
       ALTER TABLE public.supply_hub_terminals ADD CONSTRAINT supply_hub_terminals_email_unique UNIQUE (email);
     END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint 
+      WHERE conname = 'supply_hub_terminals_hub_code_unique' OR conname = 'supply_hub_terminals_hub_code_key'
+    ) THEN
+      ALTER TABLE public.supply_hub_terminals ADD CONSTRAINT supply_hub_terminals_hub_code_unique UNIQUE (hub_code);
+    END IF;
   END IF;
 
-  -- Ensure government_officials has email column and UNIQUE constraint
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'government_officials') THEN
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'government_officials' AND column_name = 'email') THEN
+  -- 2. Ensure government_officials has email column and UNIQUE constraint
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'government_officials') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'government_officials' AND column_name = 'email') THEN
       ALTER TABLE public.government_officials ADD COLUMN email TEXT;
     END IF;
     IF NOT EXISTS (
-      SELECT 1 FROM pg_constraint c 
-      JOIN pg_class t ON c.conrelid = t.oid 
-      WHERE t.relname = 'government_officials' AND (c.conname = 'government_officials_email_key' OR c.conname = 'government_officials_email_unique')
+      SELECT 1 FROM pg_constraint 
+      WHERE conname = 'government_officials_email_unique' OR conname = 'government_officials_email_key'
     ) THEN
       ALTER TABLE public.government_officials ADD CONSTRAINT government_officials_email_unique UNIQUE (email);
     END IF;
   END IF;
 
-  -- Ensure client_users has email column and UNIQUE constraint
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'client_users') THEN
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'client_users' AND column_name = 'email') THEN
+  -- 3. Ensure client_users has email column and UNIQUE constraint
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'client_users') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'client_users' AND column_name = 'email') THEN
       ALTER TABLE public.client_users ADD COLUMN email TEXT;
     END IF;
     IF NOT EXISTS (
-      SELECT 1 FROM pg_constraint c 
-      JOIN pg_class t ON c.conrelid = t.oid 
-      WHERE t.relname = 'client_users' AND (c.conname = 'client_users_email_key' OR c.conname = 'client_users_email_unique')
+      SELECT 1 FROM pg_constraint 
+      WHERE conname = 'client_users_email_unique' OR conname = 'client_users_email_key'
     ) THEN
       ALTER TABLE public.client_users ADD CONSTRAINT client_users_email_unique UNIQUE (email);
     END IF;
@@ -135,6 +138,7 @@ BEGIN
 END $$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_supply_hub_terminals_email ON public.supply_hub_terminals (email);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_supply_hub_terminals_hub_code ON public.supply_hub_terminals (hub_code);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_government_officials_email ON public.government_officials (email);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_client_users_email ON public.client_users (email);
 
@@ -624,13 +628,27 @@ ON CONFLICT (email) DO UPDATE SET
 -- ----------------------------------------------------------------------------
 -- 15. Seed Strategic Supply Hub Terminals (Accounts)
 -- ----------------------------------------------------------------------------
-INSERT INTO public.supply_hub_terminals (hub_code, hub_name, state, email, capacity_tonnes, contact_phone)
+INSERT INTO public.supply_hub_terminals (
+  hub_code,
+  hub_name,
+  state,
+  email,
+  capacity_tonnes,
+  contact_phone
+)
 VALUES
-  ('HUB-NL-01', 'Dimapur Railway Logistics Yard', 'Nagaland', 'hub.dimapur@nerlogistics.gov.in', 25000, '+91 94360 12345'),
-  ('HUB-AS-02', 'Guwahati Central Hub', 'Assam', 'hub.guwahati@nerlogistics.gov.in', 50000, '+91 94350 23456'),
-  ('HUB-AS-03', 'Silchar Logistics Depot', 'Assam', 'hub.silchar@nerlogistics.gov.in', 18000, '+91 94350 34567'),
-  ('HUB-AR-04', 'Itanagar Command Base', 'Arunachal Pradesh', 'hub.itanagar@nerlogistics.gov.in', 12000, '+91 94360 45678'),
-  ('HUB-ML-05', 'Shillong Highland Hub', 'Meghalaya', 'hub.shillong@nerlogistics.gov.in', 15000, '+91 94360 56789'),
+  ('HUB-AS-01', 'Guwahati Central Hub', 'Assam', 'hub.guwahati@nerlogistics.gov.in', 25000, '+91 94360 11001'),
+  ('HUB-AS-02', 'Silchar Logistics Depot', 'Assam', 'hub.silchar@nerlogistics.gov.in', 12000, '+91 94360 11002'),
+  ('HUB-AS-03', 'Dibrugarh Air Cargo Hub', 'Assam', 'hub.dibrugarh@nerlogistics.gov.in', 10000, '+91 94360 11003'),
+  ('HUB-AS-04', 'Jorhat Distribution Center', 'Assam', 'hub.jorhat@nerlogistics.gov.in', 8500, '+91 94360 11004'),
+  ('HUB-AS-05', 'Tezpur Strategic Depot', 'Assam', 'hub.tezpur@nerlogistics.gov.in', 9500, '+91 94360 11005'),
+  ('HUB-AR-01', 'Itanagar Command Base', 'Arunachal Pradesh', 'hub.itanagar@nerlogistics.gov.in', 9000, '+91 94360 22001'),
+  ('HUB-AR-02', 'Pasighat Siang Terminal', 'Arunachal Pradesh', 'hub.pasighat@nerlogistics.gov.in', 6000, '+91 94360 22002'),
+  ('HUB-AR-03', 'Tawang High Altitude Hub', 'Arunachal Pradesh', 'hub.tawang@nerlogistics.gov.in', 5000, '+91 94360 22003'),
+  ('HUB-ML-01', 'Shillong Highland Hub', 'Meghalaya', 'hub.shillong@nerlogistics.gov.in', 10000, '+91 94360 33001'),
+  ('HUB-ML-02', 'Tura Garo Hills Depot', 'Meghalaya', 'hub.tura@nerlogistics.gov.in', 6000, '+91 94360 33002'),
+  ('HUB-NL-01', 'Dimapur Railway Logistics Yard', 'Nagaland', 'hub.dimapur@nerlogistics.gov.in', 14000, '+91 94360 44001'),
+  ('HUB-NL-02', 'Kohima Capital Storage Depot', 'Nagaland', 'hub.kohima@nerlogistics.gov.in', 7500, '+91 94360 44002'),
   ('HUB-MN-06', 'Imphal Valley Central Base', 'Manipur', 'hub.imphal@nerlogistics.gov.in', 14000, '+91 94360 67890'),
   ('HUB-MZ-07', 'Aizawl Apex Warehouse', 'Mizoram', 'hub.aizawl@nerlogistics.gov.in', 10000, '+91 94360 78901'),
   ('HUB-TR-08', 'Agartala Integrated Checkpost Hub', 'Tripura', 'hub.agartala@nerlogistics.gov.in', 16000, '+91 94360 89012'),
