@@ -14,6 +14,7 @@ import {
   calculateCargoAdjustedETA,
 } from '@/lib/spatial';
 import { useAuth } from '@/context/AuthContext';
+import { BASELINE_SUPPLY_HUBS } from '@/lib/supabaseClient';
 import RegisterShipmentModal from './RegisterShipmentModal';
 import {
   Navigation,
@@ -101,6 +102,78 @@ export default function RoutePlanner({
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
 
   const cargoConfig = CARGO_MANIFEST_PRESETS[cargoTier];
+
+  // Ensure robust hub dataset with guaranteed baseline fallback
+  const availableHubs = React.useMemo(() => {
+    const rawList = hubs && hubs.length > 0 ? hubs : BASELINE_SUPPLY_HUBS;
+    const map = new Map<string, SupplyHub>();
+    for (const h of rawList) {
+      if (h && (h.id || h.name)) {
+        const key = h.id || h.name;
+        if (!map.has(key)) {
+          map.set(key, h);
+        }
+      }
+    }
+    return Array.from(map.values());
+  }, [hubs]);
+
+  // Robust value resolution for Origin
+  const resolvedOriginValue = React.useMemo(() => {
+    if (!originHub) return '';
+    if (originHub.id === 'current-location') return 'current-location';
+    const match = availableHubs.find(
+      (h) =>
+        h.id === originHub.id ||
+        (h.name && originHub.name && h.name.toLowerCase().trim() === originHub.name.toLowerCase().trim())
+    );
+    return match ? match.id : originHub.id;
+  }, [originHub, availableHubs]);
+
+  // Robust value resolution for Destination
+  const resolvedDestValue = React.useMemo(() => {
+    if (!destHub) return '';
+    const match = availableHubs.find(
+      (h) =>
+        h.id === destHub.id ||
+        (h.name && destHub.name && h.name.toLowerCase().trim() === destHub.name.toLowerCase().trim())
+    );
+    return match ? match.id : destHub.id;
+  }, [destHub, availableHubs]);
+
+  const handleOriginChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    if (val === 'current-location') {
+      onUseCurrentLocation?.();
+      return;
+    }
+    if (!val) {
+      onSetOrigin(null);
+      return;
+    }
+    const selected =
+      availableHubs.find(
+        (h) =>
+          h.id === val ||
+          (h.name && h.name.toLowerCase().trim() === val.toLowerCase().trim())
+      ) || null;
+    onSetOrigin(selected);
+  };
+
+  const handleDestinationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    if (!val) {
+      onSetDestination(null);
+      return;
+    }
+    const selected =
+      availableHubs.find(
+        (h) =>
+          h.id === val ||
+          (h.name && h.name.toLowerCase().trim() === val.toLowerCase().trim())
+      ) || null;
+    onSetDestination(selected);
+  };
 
   const handleSwap = () => {
     const temp = originHub;
@@ -245,10 +318,11 @@ export default function RoutePlanner({
       {/* Select Hubs Form */}
       <div className="space-y-2.5">
         {/* Origin Hub Selector with Dynamic GPS Privacy Switch */}
-        <div>
+        <div className="relative z-10">
           <div className="flex items-center justify-between mb-1">
-            <label className="text-[11px] font-medium text-slate-700 dark:text-slate-400">
-              Origin Strategic Hub:
+            <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+              <Building2 className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+              <span>Origin Strategic Hub:</span>
             </label>
             <div className="flex items-center gap-1.5">
               {onToggleGps && (
@@ -287,31 +361,28 @@ export default function RoutePlanner({
               )}
             </div>
           </div>
-          <select
-            value={originHub?.id || ''}
-            onChange={(e) => {
-              if (e.target.value === 'current-location') {
-                onUseCurrentLocation?.();
-                return;
-              }
-              const selected =
-                hubs.find((h) => h.id === e.target.value) || null;
-              onSetOrigin(selected);
-            }}
-            className="w-full bg-white dark:bg-[#081020] border border-slate-300 dark:border-slate-700/80 text-slate-900 dark:text-slate-100 text-xs rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-cyan-500 focus:outline-none font-medium"
-          >
-            <option value="">-- Select Origin Hub (Manual) --</option>
-            {isGpsEnabled && (
-              <option value="current-location">
-                📍 My Current Location (Live GPS{userLocation ? `: ${userLocation[0].toFixed(3)}°, ${userLocation[1].toFixed(3)}°` : ''})
-              </option>
-            )}
-            {hubs.map((hub) => (
-              <option key={`orig-${hub.id}`} value={hub.id}>
-                {hub.name} ({hub.state})
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            <select
+              id="origin-hub-select"
+              name="origin-hub"
+              value={resolvedOriginValue}
+              onChange={handleOriginChange}
+              className="w-full bg-white dark:bg-[#081020] border border-slate-300 dark:border-slate-700/80 text-slate-900 dark:text-slate-100 text-xs rounded-xl px-3 py-2.5 pr-8 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 focus:outline-none font-medium transition cursor-pointer appearance-none shadow-sm"
+            >
+              <option value="">-- Select Origin Hub (Manual) --</option>
+              {isGpsEnabled && (
+                <option value="current-location">
+                  📍 My Current Location (Live GPS{userLocation ? `: ${userLocation[0].toFixed(3)}°, ${userLocation[1].toFixed(3)}°` : ''})
+                </option>
+              )}
+              {availableHubs.map((hub) => (
+                <option key={`orig-${hub.id || hub.name}`} value={hub.id}>
+                  {hub.name} ({hub.state})
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
         </div>
 
         {/* Swap button */}
@@ -328,26 +399,35 @@ export default function RoutePlanner({
         </div>
 
         {/* Destination Hub Selector */}
-        <div>
-          <label className="block text-[11px] font-medium text-slate-700 dark:text-slate-400 mb-1">
-            Destination Strategic Hub:
-          </label>
-          <select
-            value={destHub?.id || ''}
-            onChange={(e) => {
-              const selected =
-                hubs.find((h) => h.id === e.target.value) || null;
-              onSetDestination(selected);
-            }}
-            className="w-full bg-white dark:bg-[#081020] border border-slate-300 dark:border-slate-700/80 text-slate-900 dark:text-slate-100 text-xs rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-cyan-500 focus:outline-none font-medium"
-          >
-            <option value="">-- Select Destination Hub --</option>
-            {hubs.map((hub) => (
-              <option key={`dest-${hub.id}`} value={hub.id}>
-                {hub.name} ({hub.state})
-              </option>
-            ))}
-          </select>
+        <div className="relative z-10">
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+              <Building2 className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+              <span>Destination Strategic Hub:</span>
+            </label>
+            {destHub && (
+              <span className="text-[9px] font-mono text-cyan-600 dark:text-cyan-400 font-bold">
+                {destHub.state || 'NER Hub'}
+              </span>
+            )}
+          </div>
+          <div className="relative">
+            <select
+              id="destination-hub-select"
+              name="destination-hub"
+              value={resolvedDestValue}
+              onChange={handleDestinationChange}
+              className="w-full bg-white dark:bg-[#081020] border border-slate-300 dark:border-slate-700/80 text-slate-900 dark:text-slate-100 text-xs rounded-xl px-3 py-2.5 pr-8 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 focus:outline-none font-medium transition cursor-pointer appearance-none shadow-sm"
+            >
+              <option value="">-- Select Destination Hub ({availableHubs.length} Available) --</option>
+              {availableHubs.map((hub) => (
+                <option key={`dest-${hub.id || hub.name}`} value={hub.id}>
+                  {hub.name} ({hub.state})
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
         </div>
 
         {/* Action Button */}
