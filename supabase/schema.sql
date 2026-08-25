@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS public.supply_hub_terminals (
 );
 
 -- ----------------------------------------------------------------------------
--- 4. Idempotent Auth Trigger: Auto-sync on auth.users Signup / Login
+-- 4. Idempotent Auth Trigger: Auto-sync on auth.users ONLY WHEN EMAIL IS VERIFIED
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
@@ -98,6 +98,11 @@ DECLARE
     extracted_role TEXT;
     extracted_hub_id TEXT;
 BEGIN
+    -- Strictly block profile creation if the email has not been verified yet
+    IF NEW.email_confirmed_at IS NULL THEN
+        RETURN NEW;
+    END IF;
+
     clean_email := LOWER(TRIM(NEW.email));
     extracted_name := COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', SPLIT_PART(clean_email, '@', 1));
     extracted_phone := COALESCE(NEW.raw_user_meta_data->>'phone', NULL);
@@ -166,7 +171,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
-AFTER INSERT OR UPDATE ON auth.users
+AFTER INSERT OR UPDATE OF email_confirmed_at ON auth.users
 FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ----------------------------------------------------------------------------
