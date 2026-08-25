@@ -87,6 +87,58 @@ CREATE TABLE IF NOT EXISTS public.supply_hub_terminals (
 );
 
 -- ----------------------------------------------------------------------------
+-- 3.1 Idempotent Constraint & Unique Key Fixes for Pre-existing Tables
+-- ----------------------------------------------------------------------------
+DO $$ 
+BEGIN 
+  -- Ensure supply_hub_terminals has email column and UNIQUE constraint
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'supply_hub_terminals') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'supply_hub_terminals' AND column_name = 'email') THEN
+      ALTER TABLE public.supply_hub_terminals ADD COLUMN email TEXT;
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint c 
+      JOIN pg_class t ON c.conrelid = t.oid 
+      WHERE t.relname = 'supply_hub_terminals' AND (c.conname = 'supply_hub_terminals_email_key' OR c.conname = 'supply_hub_terminals_email_unique')
+    ) THEN
+      ALTER TABLE public.supply_hub_terminals ADD CONSTRAINT supply_hub_terminals_email_unique UNIQUE (email);
+    END IF;
+  END IF;
+
+  -- Ensure government_officials has email column and UNIQUE constraint
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'government_officials') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'government_officials' AND column_name = 'email') THEN
+      ALTER TABLE public.government_officials ADD COLUMN email TEXT;
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint c 
+      JOIN pg_class t ON c.conrelid = t.oid 
+      WHERE t.relname = 'government_officials' AND (c.conname = 'government_officials_email_key' OR c.conname = 'government_officials_email_unique')
+    ) THEN
+      ALTER TABLE public.government_officials ADD CONSTRAINT government_officials_email_unique UNIQUE (email);
+    END IF;
+  END IF;
+
+  -- Ensure client_users has email column and UNIQUE constraint
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'client_users') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'client_users' AND column_name = 'email') THEN
+      ALTER TABLE public.client_users ADD COLUMN email TEXT;
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint c 
+      JOIN pg_class t ON c.conrelid = t.oid 
+      WHERE t.relname = 'client_users' AND (c.conname = 'client_users_email_key' OR c.conname = 'client_users_email_unique')
+    ) THEN
+      ALTER TABLE public.client_users ADD CONSTRAINT client_users_email_unique UNIQUE (email);
+    END IF;
+  END IF;
+END $$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_supply_hub_terminals_email ON public.supply_hub_terminals (email);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_government_officials_email ON public.government_officials (email);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_client_users_email ON public.client_users (email);
+
+-- ----------------------------------------------------------------------------
 -- 4. Idempotent Auth Trigger: Auto-sync on auth.users ONLY WHEN EMAIL IS VERIFIED
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.handle_new_user()
