@@ -55,13 +55,13 @@ import {
 } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { user, isGovOfficial, openAuthModal } = useAuth();
+  const { user, isLoggedIn, isAuthenticated, isAuthReady, isGovOfficial, openAuthModal } = useAuth();
   const gps = useGps();
 
   // Mobile viewport tab state ('map' | 'planner' | 'alerts' | 'fleet')
   const [mobileTab, setMobileTab] = useState<'map' | 'planner' | 'alerts' | 'fleet'>('map');
 
-  // Live Realtime Telemetry Hook (Hubs, Disruptions, Shipments with ner_global_live_stream channel)
+  // Live Realtime Telemetry Hook - Only fetches and subscribes when authenticated
   const {
     hubs,
     setHubs,
@@ -71,17 +71,17 @@ export default function DashboardPage() {
     setShipments,
     loading: isTelemetryLoading,
     refresh: loadData,
-  } = useRealtimeTelemetry();
+  } = useRealtimeTelemetry(isLoggedIn);
 
   const [trackedShipment, setTrackedShipment] = useState<Shipment | null>(null);
   const [trackedCitizen, setTrackedCitizen] = useState<TrackedCitizenTelemetry | null>(null);
 
   // Automatically track first active shipment once loaded
   useEffect(() => {
-    if (!trackedShipment && shipments.length > 0) {
+    if (isLoggedIn && !trackedShipment && shipments.length > 0) {
       setTrackedShipment(shipments[0]);
     }
-  }, [shipments, trackedShipment]);
+  }, [isLoggedIn, shipments, trackedShipment]);
 
   // Selection and routing states
   const [selectedHub, setSelectedHub] = useState<SupplyHub | null>(null);
@@ -202,9 +202,9 @@ export default function DashboardPage() {
     }
   }, [isGovOfficial, isSimulatingHazard]);
 
-  // Initial Route Calculation on mount (Dimapur -> Kohima)
+  // Initial Route Calculation when authenticated (Dimapur -> Kohima)
   useEffect(() => {
-    if (originHub && destHub && !routeData) {
+    if (isLoggedIn && originHub && destHub && !routeData) {
       calculateRoute(
         originHub.latitude,
         originHub.longitude,
@@ -221,7 +221,7 @@ export default function DashboardPage() {
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isLoggedIn]);
 
   // Complete Dashboard State Reset Handler
   const handleClear = useCallback(() => {
@@ -630,6 +630,27 @@ export default function DashboardPage() {
       setThreatAlert(null);
     }
   };
+
+  // 1. Initial Security Hydration Screen
+  if (!isAuthReady) {
+    return (
+      <div className="fixed inset-0 z-[99999] bg-[#030712] text-cyan-400 flex flex-col items-center justify-center p-6 space-y-4">
+        <div className="relative flex items-center justify-center">
+          <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/40 flex items-center justify-center animate-pulse">
+            <Truck className="w-8 h-8 text-cyan-400 animate-bounce" />
+          </div>
+        </div>
+        <div className="text-center space-y-1">
+          <h2 className="text-sm font-black tracking-widest uppercase font-mono text-slate-100">
+            NER Logistics Core Security
+          </h2>
+          <p className="text-xs text-slate-400 font-mono">
+            Verifying Security Clearance & Cryptographic Tokens...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen lg:h-screen flex flex-col bg-slate-50 dark:bg-[#030712] text-slate-900 dark:text-slate-100 transition-colors duration-200 lg:overflow-hidden relative">

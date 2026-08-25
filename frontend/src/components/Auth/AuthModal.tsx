@@ -23,6 +23,8 @@ import {
 
 export default function AuthModal() {
   const {
+    user,
+    isLoggedIn,
     authModalOpen,
     authModalTab,
     pendingSignup,
@@ -37,6 +39,29 @@ export default function AuthModal() {
 
   const [activeTab, setActiveTab] = useState<'public' | 'gov' | 'hub'>(authModalTab);
   const [citizenView, setCitizenView] = useState<'signin' | 'register'>('signin');
+
+  // Sync active tab with context tab when opened
+  useEffect(() => {
+    if (authModalTab) {
+      setActiveTab(authModalTab);
+    }
+  }, [authModalTab]);
+
+  // Prevent Escape key from dismissing modal when unauthenticated
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (!isLoggedIn) {
+          e.preventDefault();
+          e.stopPropagation();
+        } else {
+          closeAuthModal();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
+  }, [isLoggedIn, closeAuthModal]);
 
   // Citizen Sign In State
   const [publicIdentifier, setPublicIdentifier] = useState('');
@@ -328,13 +353,29 @@ export default function AuthModal() {
               </p>
             </div>
           </div>
-          <button
-            onClick={closeAuthModal}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          {isLoggedIn && (
+            <button
+              onClick={closeAuthModal}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              title="Close Gateway"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
+
+        {/* Mandatory Auth Banner when not logged in */}
+        {!isLoggedIn && (
+          <div className="mx-6 mt-4 p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/40 text-cyan-200 text-xs flex items-start gap-2.5 shadow-inner">
+            <Lock className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <p className="font-bold text-cyan-100">Mandatory Security Access Gate</p>
+              <p className="text-[11px] text-cyan-300/80 leading-relaxed">
+                Authentication is required to access Northeast India real-time corridor monitoring, AI risk evaluation, and emergency logistics telemetry.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Role Tab Switcher */}
         <div className="flex border-b border-slate-800 bg-slate-950/50 p-1 gap-1">
@@ -601,6 +642,21 @@ export default function AuthModal() {
                         )}
                       </button>
 
+                      {/* Demo Quick-Fill Button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPublicIdentifier('anirban.das@gmail.com');
+                          setPublicPassword('Citizen@Demo2026');
+                          setErrorMsg('');
+                          setSuccessMsg('Demo citizen credentials filled.');
+                        }}
+                        className="w-full py-1.5 px-2.5 rounded-lg text-[11px] font-mono font-semibold bg-blue-950/60 hover:bg-blue-900/80 border border-blue-700/50 text-cyan-300 transition flex items-center justify-center gap-1.5"
+                      >
+                        <Sparkles className="w-3 h-3 text-cyan-400" />
+                        <span>Quick-Fill Demo Citizen Profile</span>
+                      </button>
+
                       <div className="text-center pt-2">
                         <button
                           type="button"
@@ -839,6 +895,39 @@ export default function AuthModal() {
               >
                 {isLoading ? 'Verifying Clearance...' : 'Authenticate Official Command Access'}
               </button>
+
+              {/* Demo Quick-Fill Buttons for Officials */}
+              <div className="space-y-1.5 pt-1">
+                <span className="text-[10px] font-mono text-slate-400 uppercase">1-Click Evaluation Credentials:</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGovAgency('Border Roads Organisation (BRO)');
+                      setGovEmail('bro.hq@nic.in');
+                      setGovPassword('BRO@Command2026');
+                      setErrorMsg('');
+                      setSuccessMsg('BRO Project Vartak credentials filled.');
+                    }}
+                    className="py-1.5 px-2 rounded-lg text-[10px] font-mono font-semibold bg-amber-950/60 hover:bg-amber-900/80 border border-amber-700/50 text-amber-300 transition text-center truncate"
+                  >
+                    BRO (Project Vartak)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGovAgency('Assam State Disaster Management Authority (ASDMA)');
+                      setGovEmail('assam.asdma@gov.in');
+                      setGovPassword('ASDMA@Disaster2026');
+                      setErrorMsg('');
+                      setSuccessMsg('ASDMA Operations credentials filled.');
+                    }}
+                    className="py-1.5 px-2 rounded-lg text-[10px] font-mono font-semibold bg-amber-950/60 hover:bg-amber-900/80 border border-amber-700/50 text-amber-300 transition text-center truncate"
+                  >
+                    ASDMA (Assam State)
+                  </button>
+                </div>
+              </div>
             </form>
           )}
 
@@ -921,6 +1010,39 @@ export default function AuthModal() {
               >
                 {isLoading ? 'Connecting to Hub...' : 'Connect to Strategic Depot Terminal'}
               </button>
+
+              {/* Demo Quick-Fill Buttons for Supply Hubs */}
+              <div className="space-y-1.5 pt-1">
+                <span className="text-[10px] font-mono text-slate-400 uppercase">1-Click Terminal Access:</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHubCode('HUB-NL-01');
+                      setHubEmail('hub.dimapur@nerlogistics.gov.in');
+                      setHubPassword('Hub@Dimapur2026');
+                      setErrorMsg('');
+                      setSuccessMsg('Dimapur Railhead Depot credentials filled.');
+                    }}
+                    className="py-1.5 px-2 rounded-lg text-[10px] font-mono font-semibold bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-700/50 text-emerald-300 transition text-center truncate"
+                  >
+                    Dimapur Railhead
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHubCode('HUB-AS-02');
+                      setHubEmail('hub.guwahati@nerlogistics.gov.in');
+                      setHubPassword('Hub@Guwahati2026');
+                      setErrorMsg('');
+                      setSuccessMsg('Guwahati Transshipment Hub credentials filled.');
+                    }}
+                    className="py-1.5 px-2 rounded-lg text-[10px] font-mono font-semibold bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-700/50 text-emerald-300 transition text-center truncate"
+                  >
+                    Guwahati Multi-Modal
+                  </button>
+                </div>
+              </div>
             </form>
           )}
         </div>

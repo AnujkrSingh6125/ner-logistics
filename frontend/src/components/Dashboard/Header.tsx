@@ -17,6 +17,7 @@ import {
   X,
   Radio,
   ChevronRight,
+  LogOut,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -40,7 +41,7 @@ export default function Header({
   onRefresh,
   isRefreshing,
 }: HeaderProps) {
-  const { user, isGovOfficial, isLoggedIn, openAuthModal } = useAuth();
+  const { user, isGovOfficial, isLoggedIn, openAuthModal, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { statusText, badgeColor, toggleGps } = useGps();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -174,32 +175,27 @@ export default function Header({
 
             {/* Profile Dropdown or Auth Triggers */}
             {isLoggedIn && user ? (
-              <UserProfileDropdown />
+              <div className="flex items-center gap-1.5">
+                <UserProfileDropdown />
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="min-h-[44px] hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600/15 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/40 hover:border-rose-500 transition shadow-sm"
+                  title="Lock Terminal & Sign Out"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Lock & Sign Out</span>
+                </button>
+              </div>
             ) : (
-              <div className="hidden lg:flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => openAuthModal('public')}
-                  className="min-h-[44px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition shadow-md"
+                  className="min-h-[44px] flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 text-white hover:brightness-110 transition shadow-lg shadow-blue-500/20"
                 >
-                  <User className="w-3.5 h-3.5" />
-                  <span>Citizen / Driver</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openAuthModal('gov')}
-                  className="min-h-[44px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-600 to-red-600 hover:from-amber-500 hover:to-red-500 text-white transition shadow-md"
-                >
-                  <ShieldAlert className="w-3.5 h-3.5" />
-                  <span>SDMA</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openAuthModal('hub')}
-                  className="min-h-[44px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-md"
-                >
-                  <Warehouse className="w-3.5 h-3.5" />
-                  <span>Hub Depot</span>
+                  <Lock className="w-3.5 h-3.5 text-cyan-200" />
+                  <span>Authenticate & Unlock</span>
                 </button>
               </div>
             )}
@@ -309,8 +305,22 @@ export default function Header({
                   </button>
                 </>
               ) : (
-                <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-xs text-emerald-400 font-bold">
-                  Active Session: {user?.full_name} ({user?.role})
+                <div className="space-y-2">
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-xs">
+                    <p className="text-slate-100 font-bold truncate">{user?.full_name}</p>
+                    <p className="text-[10px] font-mono text-emerald-400 uppercase font-semibold">{user?.role}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      logout();
+                    }}
+                    className="w-full min-h-[48px] px-4 py-3 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Lock Terminal & Sign Out</span>
+                  </button>
                 </div>
               )}
 

@@ -305,10 +305,14 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     statusText === 'LIVE CONNECTED' ? 'emerald' : statusText === 'GPS MUTED' ? 'amber' : 'slate';
 
   useEffect(() => {
+    if (!user) {
+      disableGps();
+      return;
+    }
     if (typeof window !== 'undefined' && 'geolocation' in navigator) {
       startBrowserWatch();
     }
-  }, [startBrowserWatch]);
+  }, [user, startBrowserWatch, disableGps]);
 
   // 🛰️ Real-Time Telemetry Auto-Sync to Supabase & Backend for Active Citizen Users
   const lastSyncedCoordsRef = useRef<[number, number] | null>(null);

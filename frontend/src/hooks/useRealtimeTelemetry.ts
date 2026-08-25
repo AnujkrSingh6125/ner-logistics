@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase, BASELINE_SUPPLY_HUBS, BASELINE_DISRUPTIONS, normalizeShipment, normalizeSupplyHub } from '@/lib/supabaseClient';
 import { SupplyHub, RoadDisruption, Shipment } from '@/types';
 
-export function useRealtimeTelemetry() {
+export function useRealtimeTelemetry(enabled: boolean = true) {
   const [disruptions, setDisruptions] = useState<RoadDisruption[]>(BASELINE_DISRUPTIONS);
   const [hubs, setHubs] = useState<SupplyHub[]>(BASELINE_SUPPLY_HUBS.map(normalizeSupplyHub));
   const [shipments, setShipments] = useState<Shipment[]>([]);
@@ -10,7 +10,7 @@ export function useRealtimeTelemetry() {
 
   // Initial Fetch for Hubs, Disruptions & Shipments
   const loadInitialData = useCallback(async () => {
-    if (!supabase) {
+    if (!enabled || !supabase) {
       setLoading(false);
       return;
     }
@@ -36,9 +36,14 @@ export function useRealtimeTelemetry() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
+
     let isMounted = true;
     loadInitialData();
 

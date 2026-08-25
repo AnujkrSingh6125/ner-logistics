@@ -212,6 +212,8 @@ interface AuthContextType {
   user: UserProfile | null;
   role: UserRole | null;
   isLoggedIn: boolean;
+  isAuthenticated: boolean;
+  isAuthReady: boolean;
   isGovOfficial: boolean;
   isGovAuthority: boolean;
   isHubOperator: boolean;
@@ -235,7 +237,7 @@ interface AuthContextType {
   resendOTP: () => Promise<{ success: boolean; message: string; otp?: string }>;
   toggleLocationSharing: () => Promise<boolean>;
   deleteAccount: () => Promise<{ success: boolean; message: string }>;
-  saveSession: (profile: UserProfile) => void;
+  saveSession: (profile: UserProfile | null) => void;
   logout: () => void;
 }
 
@@ -246,7 +248,8 @@ const REGISTERED_CITIZENS_KEY = 'ner_registered_citizens_db';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
+  const [isAuthReady, setIsAuthReady] = useState<boolean>(false);
+  const [authModalOpen, setAuthModalOpen] = useState<boolean>(true);
   const [authModalTab, setAuthModalTab] = useState<'public' | 'gov' | 'hub'>('public');
   const [pendingSignup, setPendingSignup] = useState<PendingSignup | null>(null);
 
@@ -256,10 +259,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const savedSession = localStorage.getItem(STORAGE_KEY);
       if (savedSession) {
         const parsed = JSON.parse(savedSession);
-        setUser(parsed);
+        if (parsed && (parsed.id || parsed.email)) {
+          setUser(parsed);
+          setAuthModalOpen(false);
+        } else {
+          setAuthModalOpen(true);
+        }
+      } else {
+        setAuthModalOpen(true);
       }
     } catch (err) {
       console.warn('Error reading auth session from storage:', err);
+      setAuthModalOpen(true);
+    } finally {
+      setIsAuthReady(true);
     }
   }, []);
 
@@ -267,8 +280,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(profile);
     if (profile) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+      setAuthModalOpen(false);
     } else {
       localStorage.removeItem(STORAGE_KEY);
+      setAuthModalOpen(true);
     }
   };
 
@@ -278,8 +293,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const closeAuthModal = () => {
-    setAuthModalOpen(false);
-    setPendingSignup(null);
+    // Only allow dismissal if user is authenticated
+    if (user) {
+      setAuthModalOpen(false);
+      setPendingSignup(null);
+    }
   };
 
   // Helper: Upsert User Profile to Supabase client_users
@@ -898,7 +916,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // 8. Logout
   const logout = () => {
     saveSession(null);
-    closeAuthModal();
+    setAuthModalTab('public');
+    setAuthModalOpen(true);
   };
 
   const isGovOfficial = user?.role === 'gov_official' || user?.role === 'GOV_AUTHORITY';
@@ -921,6 +940,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         role: user?.role || null,
         isLoggedIn: !!user,
+        isAuthenticated: !!user,
+        isAuthReady,
         isGovOfficial,
         isGovAuthority,
         isHubOperator,
