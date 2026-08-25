@@ -2,7 +2,7 @@
 -- NER SMART LOGISTICS PLATFORM (SIH PROBLEM ID: 26002)
 -- MASTER DATABASE SCHEMA & REALTIME REPLICATION ENGINE
 -- ============================================================================
--- 50 strategic supply hubs, 50 terminals, road disruptions, shipments, and live system broadcasts.
+-- 50 strategic supply hubs, 50 terminals, shipments, live journeys, disruptions, and system broadcasts.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -17,6 +17,7 @@ DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
 -- Drop obsolete profiles table and operational tables for clean setup
 DROP TABLE IF EXISTS public.profiles CASCADE;
 DROP TABLE IF EXISTS public.shipments CASCADE;
+DROP TABLE IF EXISTS public.live_journeys CASCADE;
 DROP TABLE IF EXISTS public.road_disruptions CASCADE;
 DROP TABLE IF EXISTS public.system_broadcasts CASCADE;
 DROP TABLE IF EXISTS public.supply_hub_terminals CASCADE;
@@ -108,8 +109,60 @@ CREATE TABLE IF NOT EXISTS public.government_officials (
 );
 
 -- ----------------------------------------------------------------------------
--- 5. TABLE: ROAD DISRUPTIONS & SHIPMENTS & SYSTEM BROADCASTS
+-- 5. OPERATIONAL TABLES: SHIPMENTS, TELEMETRY, HAZARDS & BROADCASTS
 -- ----------------------------------------------------------------------------
+-- 5.1 LIVE SHIPMENTS TABLE (Cargo consignments, route progress & coordinates)
+CREATE TABLE public.shipments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tracking_number TEXT UNIQUE NOT NULL,
+  tracking_code TEXT UNIQUE,
+  driver_id TEXT,
+  driver_name TEXT,
+  origin_hub TEXT NOT NULL REFERENCES public.supply_hubs(name) ON UPDATE CASCADE,
+  destination_hub TEXT NOT NULL REFERENCES public.supply_hubs(name) ON UPDATE CASCADE,
+  origin_name TEXT,
+  destination_name TEXT,
+  cargo_type TEXT NOT NULL,
+  cargo_tier TEXT DEFAULT 'STANDARD',
+  cargo_manifest TEXT,
+  weight_tons NUMERIC NOT NULL DEFAULT 5.0,
+  weight_tonnes NUMERIC DEFAULT 5.0,
+  priority_level INT DEFAULT 1,
+  status TEXT DEFAULT 'DISPATCHED',
+  current_status TEXT DEFAULT 'IN_TRANSIT',
+  current_lat DOUBLE PRECISION,
+  current_lng DOUBLE PRECISION,
+  heading NUMERIC DEFAULT 0,
+  speed NUMERIC DEFAULT 45,
+  threat_score NUMERIC DEFAULT 0,
+  dispatched_by_hub_id TEXT,
+  hub_id TEXT,
+  hub_code TEXT,
+  notes TEXT,
+  last_ping_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 5.2 LIVE JOURNEYS TELEMETRY TABLE (Live GPS streams from drivers)
+CREATE TABLE public.live_journeys (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id TEXT,
+  citizen_uid TEXT UNIQUE NOT NULL,
+  driver_name TEXT NOT NULL DEFAULT 'Citizen Driver',
+  origin_hub TEXT,
+  destination_hub TEXT,
+  current_lat DOUBLE PRECISION NOT NULL,
+  current_lng DOUBLE PRECISION NOT NULL,
+  heading DOUBLE PRECISION DEFAULT 0,
+  speed_kmh DOUBLE PRECISION DEFAULT 40,
+  is_active BOOLEAN DEFAULT TRUE,
+  shared_with TEXT DEFAULT 'ALL',
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 5.3 ROAD DISRUPTIONS TABLE
 CREATE TABLE public.road_disruptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT,
@@ -136,29 +189,7 @@ CREATE TABLE public.road_disruptions (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE public.shipments (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tracking_number TEXT UNIQUE NOT NULL,
-  tracking_code TEXT UNIQUE,
-  driver_id TEXT,
-  driver_name TEXT,
-  origin_hub TEXT NOT NULL REFERENCES public.supply_hubs(name) ON UPDATE CASCADE,
-  destination_hub TEXT NOT NULL REFERENCES public.supply_hubs(name) ON UPDATE CASCADE,
-  origin_name TEXT,
-  destination_name TEXT,
-  cargo_type TEXT NOT NULL,
-  cargo_manifest TEXT,
-  weight_tons NUMERIC NOT NULL DEFAULT 5.0,
-  weight_tonnes NUMERIC DEFAULT 5.0,
-  priority_level INT DEFAULT 1,
-  status TEXT DEFAULT 'DISPATCHED',
-  current_status TEXT DEFAULT 'IN_TRANSIT',
-  current_lat DOUBLE PRECISION,
-  current_lng DOUBLE PRECISION,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
+-- 5.4 SYSTEM BROADCASTS TABLE
 CREATE TABLE public.system_broadcasts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   severity TEXT NOT NULL DEFAULT 'CRITICAL',
@@ -178,19 +209,23 @@ CREATE TABLE public.system_broadcasts (
 -- ----------------------------------------------------------------------------
 ALTER TABLE public.supply_hubs REPLICA IDENTITY FULL;
 ALTER TABLE public.supply_hub_terminals REPLICA IDENTITY FULL;
-ALTER TABLE public.road_disruptions REPLICA IDENTITY FULL;
 ALTER TABLE public.shipments REPLICA IDENTITY FULL;
+ALTER TABLE public.live_journeys REPLICA IDENTITY FULL;
+ALTER TABLE public.road_disruptions REPLICA IDENTITY FULL;
 ALTER TABLE public.system_broadcasts REPLICA IDENTITY FULL;
 ALTER TABLE public.client_users REPLICA IDENTITY FULL;
 ALTER TABLE public.government_officials REPLICA IDENTITY FULL;
 
 DO $$ 
 BEGIN 
-  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'road_disruptions') THEN 
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.road_disruptions; 
-  END IF; 
   IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'shipments') THEN 
     ALTER PUBLICATION supabase_realtime ADD TABLE public.shipments; 
+  END IF; 
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'live_journeys') THEN 
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.live_journeys; 
+  END IF; 
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'road_disruptions') THEN 
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.road_disruptions; 
   END IF; 
   IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'system_broadcasts') THEN 
     ALTER PUBLICATION supabase_realtime ADD TABLE public.system_broadcasts; 
@@ -207,8 +242,9 @@ ALTER TABLE public.supply_hubs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.supply_hub_terminals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.client_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.government_officials ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.road_disruptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shipments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.live_journeys ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.road_disruptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.system_broadcasts ENABLE ROW LEVEL SECURITY;
 
 -- Idempotent RLS Policy Setup (DROP IF EXISTS before CREATE)
@@ -224,11 +260,14 @@ CREATE POLICY "Public read client_users" ON public.client_users FOR ALL USING (t
 DROP POLICY IF EXISTS "Public read government_officials" ON public.government_officials;
 CREATE POLICY "Public read government_officials" ON public.government_officials FOR ALL USING (true);
 
-DROP POLICY IF EXISTS "Operational road_disruptions" ON public.road_disruptions;
-CREATE POLICY "Operational road_disruptions" ON public.road_disruptions FOR ALL USING (true) WITH CHECK (true);
-
 DROP POLICY IF EXISTS "Operational shipments" ON public.shipments;
 CREATE POLICY "Operational shipments" ON public.shipments FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Operational live_journeys" ON public.live_journeys;
+CREATE POLICY "Operational live_journeys" ON public.live_journeys FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Operational road_disruptions" ON public.road_disruptions;
+CREATE POLICY "Operational road_disruptions" ON public.road_disruptions FOR ALL USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Public read broadcasts" ON public.system_broadcasts;
 CREATE POLICY "Public read broadcasts" ON public.system_broadcasts FOR SELECT USING (true);
