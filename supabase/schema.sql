@@ -54,6 +54,7 @@ BEGIN
 END; 
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS enforce_max_50_hubs ON public.supply_hubs;
 CREATE TRIGGER enforce_max_50_hubs
   BEFORE INSERT ON public.supply_hubs
   FOR EACH ROW EXECUTE FUNCTION public.check_max_50_hubs();
@@ -173,7 +174,7 @@ CREATE TABLE public.system_broadcasts (
 );
 
 -- ----------------------------------------------------------------------------
--- 6. REALTIME REPLICATION & RLS
+-- 6. REALTIME REPLICATION & IDEMPOTENT RLS
 -- ----------------------------------------------------------------------------
 ALTER TABLE public.supply_hubs REPLICA IDENTITY FULL;
 ALTER TABLE public.supply_hub_terminals REPLICA IDENTITY FULL;
@@ -210,13 +211,29 @@ ALTER TABLE public.road_disruptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shipments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.system_broadcasts ENABLE ROW LEVEL SECURITY;
 
+-- Idempotent RLS Policy Setup (DROP IF EXISTS before CREATE)
+DROP POLICY IF EXISTS "Public read supply_hubs" ON public.supply_hubs;
 CREATE POLICY "Public read supply_hubs" ON public.supply_hubs FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Public read terminals" ON public.supply_hub_terminals;
 CREATE POLICY "Public read terminals" ON public.supply_hub_terminals FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Public read client_users" ON public.client_users;
 CREATE POLICY "Public read client_users" ON public.client_users FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Public read government_officials" ON public.government_officials;
 CREATE POLICY "Public read government_officials" ON public.government_officials FOR ALL USING (true);
+
+DROP POLICY IF EXISTS "Operational road_disruptions" ON public.road_disruptions;
 CREATE POLICY "Operational road_disruptions" ON public.road_disruptions FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Operational shipments" ON public.shipments;
 CREATE POLICY "Operational shipments" ON public.shipments FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public read broadcasts" ON public.system_broadcasts;
 CREATE POLICY "Public read broadcasts" ON public.system_broadcasts FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Operational insert broadcasts" ON public.system_broadcasts;
 CREATE POLICY "Operational insert broadcasts" ON public.system_broadcasts FOR ALL USING (true) WITH CHECK (true);
 
 -- ----------------------------------------------------------------------------
