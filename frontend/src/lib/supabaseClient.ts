@@ -1607,6 +1607,18 @@ export function subscribeToAllBroadcastsRealtime(
 ) {
   const cleanupFns: Array<() => void> = [];
 
+  const normalizeBroadcast = (raw: any): SystemBroadcast => ({
+    id: String(raw.id || `broadcast-${Date.now()}`),
+    title: raw.title || 'CORRIDOR ALERT',
+    message: raw.message || raw.description || 'Emergency corridor advisory active.',
+    severity: (raw.severity || 'CRITICAL') as any,
+    agency: raw.agency || raw.source_agency || raw.reported_by_agency || 'Government Authority',
+    issued_by_name: raw.issued_by_name || raw.verified_by_official || 'Official Command Desk',
+    affected_region: raw.affected_region || raw.highway_reference || 'Northeast Regional Corridor',
+    is_active: raw.is_active ?? true,
+    created_at: raw.created_at || new Date().toISOString(),
+  });
+
   // 1. Native Cross-Tab BroadcastChannel Listener (0ms instant cross-window sync)
   if (crossTabChannel) {
     const handleBroadcastMsg = (ev: MessageEvent) => {
@@ -1614,11 +1626,11 @@ export function subscribeToAllBroadcastsRealtime(
       if (!data) return;
 
       if (data.type === 'broadcast_insert') {
-        onInsert(data.payload);
+        onInsert(normalizeBroadcast(data.payload));
       } else if (data.type === 'broadcast_update') {
-        onUpdate(data.payload);
+        onUpdate(normalizeBroadcast(data.payload));
       } else if (data.type === 'broadcast_delete') {
-        onDelete(data.payload);
+        onDelete(String(data.payload));
       }
     };
 
@@ -1634,11 +1646,11 @@ export function subscribeToAllBroadcastsRealtime(
           const parsed = JSON.parse(ev.newValue);
           const data = parsed.event as RealtimeSyncEvent;
           if (data.type === 'broadcast_insert') {
-            onInsert(data.payload);
+            onInsert(normalizeBroadcast(data.payload));
           } else if (data.type === 'broadcast_update') {
-            onUpdate(data.payload);
+            onUpdate(normalizeBroadcast(data.payload));
           } else if (data.type === 'broadcast_delete') {
-            onDelete(data.payload);
+            onDelete(String(data.payload));
           }
         } catch (e) {}
       }
@@ -1659,23 +1671,23 @@ export function subscribeToAllBroadcastsRealtime(
           (payload: any) => {
             console.log('[SUPABASE REALTIME SYSTEM_BROADCASTS EVENT]:', payload.eventType, payload);
             if (payload.eventType === 'INSERT' && payload.new) {
-              onInsert(payload.new as SystemBroadcast);
+              onInsert(normalizeBroadcast(payload.new));
             } else if (payload.eventType === 'UPDATE' && payload.new) {
               if (payload.new.is_active === false) {
-                onDelete(payload.new.id);
+                onDelete(String(payload.new.id));
               } else {
-                onUpdate(payload.new as SystemBroadcast);
+                onUpdate(normalizeBroadcast(payload.new));
               }
             } else if (payload.eventType === 'DELETE' && payload.old) {
-              onDelete(payload.old.id);
+              onDelete(String(payload.old.id));
             }
           }
         )
         .on('broadcast', { event: 'broadcast_insert' }, (msg: any) => {
-          if (msg.payload) onInsert(msg.payload);
+          if (msg.payload) onInsert(normalizeBroadcast(msg.payload));
         })
         .on('broadcast', { event: 'broadcast_update' }, (msg: any) => {
-          if (msg.payload) onUpdate(msg.payload);
+          if (msg.payload) onUpdate(normalizeBroadcast(msg.payload));
         })
         .on('broadcast', { event: 'broadcast_delete' }, (msg: any) => {
           if (msg.payload && onDelete) onDelete(String(msg.payload));

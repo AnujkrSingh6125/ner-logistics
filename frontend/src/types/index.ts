@@ -141,7 +141,9 @@ export interface RoadDisruption {
   latitude: number;
   longitude: number;
   risk_radius_meters: number;
+  radius_meters?: number;
   message?: string;
+  advisory_message?: string;
   highway_reference?: string;
   description?: string;
   is_active: boolean;

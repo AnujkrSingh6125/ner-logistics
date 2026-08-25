@@ -2,7 +2,7 @@
 -- NER SMART LOGISTICS PLATFORM (SIH PROBLEM ID: 26002)
 -- MASTER DATABASE SCHEMA & REALTIME REPLICATION ENGINE
 -- ============================================================================
--- 50 strategic supply hubs, 50 terminals, zero-error constraints, and realtime WebSockets.
+-- 50 strategic supply hubs, 50 terminals, road disruptions, shipments, and live system broadcasts.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -18,6 +18,7 @@ DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
 DROP TABLE IF EXISTS public.profiles CASCADE;
 DROP TABLE IF EXISTS public.shipments CASCADE;
 DROP TABLE IF EXISTS public.road_disruptions CASCADE;
+DROP TABLE IF EXISTS public.system_broadcasts CASCADE;
 DROP TABLE IF EXISTS public.supply_hub_terminals CASCADE;
 DROP TABLE IF EXISTS public.supply_hubs CASCADE;
 
@@ -106,7 +107,7 @@ CREATE TABLE IF NOT EXISTS public.government_officials (
 );
 
 -- ----------------------------------------------------------------------------
--- 5. TABLE: ROAD DISRUPTIONS & SHIPMENTS
+-- 5. TABLE: ROAD DISRUPTIONS & SHIPMENTS & SYSTEM BROADCASTS
 -- ----------------------------------------------------------------------------
 CREATE TABLE public.road_disruptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -157,6 +158,20 @@ CREATE TABLE public.shipments (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE public.system_broadcasts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  severity TEXT NOT NULL DEFAULT 'CRITICAL',
+  title TEXT DEFAULT 'CORRIDOR ALERT',
+  message TEXT NOT NULL,
+  source_agency TEXT DEFAULT 'Government Authority',
+  agency TEXT DEFAULT 'Government Authority',
+  issued_by_name TEXT DEFAULT 'Official Command Desk',
+  affected_region TEXT DEFAULT 'Northeast Regional Corridor',
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ----------------------------------------------------------------------------
 -- 6. REALTIME REPLICATION & RLS
 -- ----------------------------------------------------------------------------
@@ -164,6 +179,7 @@ ALTER TABLE public.supply_hubs REPLICA IDENTITY FULL;
 ALTER TABLE public.supply_hub_terminals REPLICA IDENTITY FULL;
 ALTER TABLE public.road_disruptions REPLICA IDENTITY FULL;
 ALTER TABLE public.shipments REPLICA IDENTITY FULL;
+ALTER TABLE public.system_broadcasts REPLICA IDENTITY FULL;
 ALTER TABLE public.client_users REPLICA IDENTITY FULL;
 ALTER TABLE public.government_officials REPLICA IDENTITY FULL;
 
@@ -174,6 +190,9 @@ BEGIN
   END IF; 
   IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'shipments') THEN 
     ALTER PUBLICATION supabase_realtime ADD TABLE public.shipments; 
+  END IF; 
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'system_broadcasts') THEN 
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.system_broadcasts; 
   END IF; 
   IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'supply_hubs') THEN 
     ALTER PUBLICATION supabase_realtime ADD TABLE public.supply_hubs; 
@@ -189,6 +208,7 @@ ALTER TABLE public.client_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.government_officials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.road_disruptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shipments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.system_broadcasts ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Public read supply_hubs" ON public.supply_hubs FOR SELECT USING (true);
 CREATE POLICY "Public read terminals" ON public.supply_hub_terminals FOR SELECT USING (true);
@@ -196,6 +216,8 @@ CREATE POLICY "Public read client_users" ON public.client_users FOR ALL USING (t
 CREATE POLICY "Public read government_officials" ON public.government_officials FOR ALL USING (true);
 CREATE POLICY "Operational road_disruptions" ON public.road_disruptions FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Operational shipments" ON public.shipments FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public read broadcasts" ON public.system_broadcasts FOR SELECT USING (true);
+CREATE POLICY "Operational insert broadcasts" ON public.system_broadcasts FOR ALL USING (true) WITH CHECK (true);
 
 -- ----------------------------------------------------------------------------
 -- 7. SEED: EXACTLY 50 STRATEGIC SUPPLY HUBS

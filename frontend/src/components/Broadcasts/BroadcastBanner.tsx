@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import CreateBroadcastModal from './CreateBroadcastModal';
 import AllBroadcastsModal from './AllBroadcastsModal';
-import { subscribeToAllBroadcastsRealtime } from '@/lib/supabaseClient';
+import { subscribeToAllBroadcastsRealtime, subscribeToAllHazardsRealtime } from '@/lib/supabaseClient';
 
 export default function BroadcastBanner() {
   const { isGovOfficial } = useAuth();
@@ -56,9 +56,12 @@ export default function BroadcastBanner() {
 
   useEffect(() => {
     fetchBroadcasts();
-    const unsub = subscribeToAllBroadcastsRealtime(
+
+    // 1. Direct System Broadcasts WebSocket & Cross-Tab Subscription
+    const unsubBroadcasts = subscribeToAllBroadcastsRealtime(
       (incoming) => {
         setBroadcasts((prev) => [incoming, ...prev.filter((b) => b.id !== incoming.id)]);
+        setCurrentIndex(0);
       },
       (updated) => {
         setBroadcasts((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
@@ -67,8 +70,52 @@ export default function BroadcastBanner() {
         setBroadcasts((prev) => prev.filter((b) => b.id !== deletedId));
       }
     );
+
+    // 2. Critical Road Hazard & Government Advisory WebSocket Sync
+    const unsubHazards = subscribeToAllHazardsRealtime(
+      (hazard) => {
+        if (hazard.advisory_message || hazard.severity === 'CRITICAL' || hazard.severity === 'HIGH') {
+          const synth: SystemBroadcast = {
+            id: `hazard-advisory-${hazard.id}`,
+            title: hazard.title || `${hazard.disruption_type || 'HAZARD'} ADVISORY`,
+            message: hazard.advisory_message || hazard.message || hazard.description || 'Emergency corridor caution advised.',
+            severity: (hazard.severity === 'CRITICAL' ? 'CRITICAL' : 'WARNING') as any,
+            agency: hazard.government_body_name || hazard.reported_by_agency || 'Border Roads Organisation (BRO)',
+            issued_by_name: hazard.verified_by_official || 'Command Official',
+            affected_region: hazard.highway_reference || 'Northeast Freight Corridor',
+            is_active: hazard.is_active ?? true,
+            created_at: hazard.created_at || new Date().toISOString(),
+          };
+          setBroadcasts((prev) => [synth, ...prev.filter((b) => b.id !== synth.id)]);
+          setCurrentIndex(0);
+        }
+      },
+      (updatedHazard) => {
+        if (updatedHazard.is_active === false) {
+          setBroadcasts((prev) => prev.filter((b) => b.id !== `hazard-advisory-${updatedHazard.id}`));
+        } else if (updatedHazard.advisory_message || updatedHazard.severity === 'CRITICAL' || updatedHazard.severity === 'HIGH') {
+          const synth: SystemBroadcast = {
+            id: `hazard-advisory-${updatedHazard.id}`,
+            title: updatedHazard.title || `${updatedHazard.disruption_type || 'HAZARD'} ADVISORY`,
+            message: updatedHazard.advisory_message || updatedHazard.message || updatedHazard.description || 'Emergency corridor caution advised.',
+            severity: (updatedHazard.severity === 'CRITICAL' ? 'CRITICAL' : 'WARNING') as any,
+            agency: updatedHazard.government_body_name || updatedHazard.reported_by_agency || 'Border Roads Organisation (BRO)',
+            issued_by_name: updatedHazard.verified_by_official || 'Command Official',
+            affected_region: updatedHazard.highway_reference || 'Northeast Freight Corridor',
+            is_active: updatedHazard.is_active ?? true,
+            created_at: updatedHazard.created_at || new Date().toISOString(),
+          };
+          setBroadcasts((prev) => [synth, ...prev.filter((b) => b.id !== synth.id)]);
+        }
+      },
+      (deletedId) => {
+        setBroadcasts((prev) => prev.filter((b) => b.id !== `hazard-advisory-${deletedId}`));
+      }
+    );
+
     return () => {
-      unsub();
+      unsubBroadcasts();
+      unsubHazards();
     };
   }, []);
 
